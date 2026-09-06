@@ -4,6 +4,34 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows semantic versioning for plugin releases.
 
+## [2.9.77] - 2026-09-06
+
+### Added
+
+- Five more well-known files tracked alongside robots.txt in Traffic Controls > Network Intelligence > Well-Known Files: `agents.txt`, `security.txt`, `humans.txt`, `ads.txt`, and `app-ads.txt` (`Agents_Rules_Store`, `Security_Txt_Store`, `Humans_Txt_Store`, `Ads_Txt_Store`, `App_Ads_Txt_Store`), each with its own daily `wp_sam_daily_scan` refresh and manual "Refresh Now" admin action. `agents.txt` also gets `Agents_Compliance_Detector` (a Disallow-rule compliance check, mirroring `Robots_Compliance_Detector`) alongside a visit-recognition detector; the other four get visit-recognition only, since their file formats have no per-path rule to check compliance against.
+- Geo-IP country block/allow grid (Network Intelligence > Geo-IP > Country Block List): every ISO 3166-1 country defaults to Allow, click-to-toggle Block, nothing written until Save. Before writing a newly-blocked country, checks whether it would block the requesting administrator's own current IP (via the same Geo-IP lookup the live request path uses) with no covering `Ip_Rule_Store` allow entry for that surface; if so, the save is held behind an explicit "I understand this may lock me out -- save anyway" confirmation. The same check now also covers the pre-existing generic "Add a network rule" form (country and, via `Asn_Lookup_Store`, ASN rules too) via a shared `Admin_UI::network_rule_lockout_warning()` helper.
+- `Detector::description()` -- a one-line, plain-language explanation of what a detector actually looks for, overridden by all 27 built-in detectors plus `Custom_Rule_Detector`'s dynamic name/pattern fallback -- surfaced as a new Description column on the Detectors tab, alongside a hover tooltip explaining what "(fixed)" means for an observe-only-by-design family.
+
+### Changed
+
+- Traffic Controls > Policy is now a single table (one row per surface) instead of four stacked per-surface forms, matching the CSP Profiles table's look.
+- Traffic Controls > Blocks gets its own `.wp-sam-blocks-table` column-width CSS instead of reusing Violations table widths calibrated for a different layout.
+- Traffic Controls > Network Intelligence is split into Tor Exit List / ASN Lookup / Geo-IP / Well-Known Files / Network Rules sub-tabs, and no longer caps content to 600-700px; the Detectors and Custom Rules tabs' intro paragraphs also no longer cap to 700px.
+- About tab's "What this plugin covers" is regrouped into Browser & Header Security / Threat Detection & Traffic Control / Site Integrity & Recovery / Certificates, and now mentions Traffic Controls & Network Intelligence and Advanced Intelligence, both previously missing entirely despite each having its own top-level nav entry. The built-in-detector count is computed live from `Detector_Registry` instead of a hardcoded number that was already stale before this release.
+- The short "tagline" description (readme.txt and the plugin header's `Description:` field) is updated to "Self-learning security headers, built-in attack detection and rate limiting, file-integrity monitoring, and free TLS certificates. No paywall." (142 characters) -- the previous line, updated only last release, still said nothing about file-integrity monitoring and described rate limiting as "traffic filtering".
+
+### Fixed
+
+- `Traffic_Guard::decide()` no longer lets automatic rate-limit escalation block a loopback address (127.0.0.0/8, `::1`) -- wp-cron's own loopback requests and Site Health's "Loopback request" check were tripping the rate limiter and landing in the Blocks list as if from a remote attacker. An explicit administrator `Ip_Rule_Store` block rule for a loopback address still applies; only automatic escalation is exempted. The loopback CIDR definition is now a single shared `Cidr_Matcher::LOOPBACK_CIDRS` constant, also used by `Identity_Resolver`, instead of two independently-maintained copies.
+- The Geo-IP self-lockout check failed open (silently proceeded with no warning) whenever the Geo-IP lookup for the administrator's own IP returned no country -- an API outage or rate limit that `Geo_Ip_Store` caches for 30 days. It now treats an unresolvable country as its own reason to warn.
+- The self-lockout check only looked for an `Ip_Rule_Store` allow rule scoped to the `admin` surface, even though the country block it was about to write applies to every surface -- an admin-only allow rule could silence the warning while leaving `wp-login.php` itself blocked. It now checks the same surface the new rule would actually apply to.
+- The Geo-IP country grid could silently delete an existing all-surface country rule whose value wasn't one of the bundled ISO codes (e.g. one added via the generic form with a non-standard code) -- it can never render as checked in the grid, so it was always treated as "unchecked" and removed on an unrelated save. The grid now only ever manages rows with a known code.
+- The pending self-lockout warning transient was deleted on every GET render of its tab, including an incidental page reload -- so following the warning's own advice (check the IP Rules tab, then come back) silently discarded it. It is now only cleared by an actual save.
+- A bookmarked or scripted `?lookup_ip=`/`?geo_lookup_ip=` link (valid before Network Intelligence had sub-tabs) silently landed on the wrong sub-tab with the parameter never read, once sub-tabs shipped. The sub-tab now defaults from whichever of those legacy parameters is present.
+- `Agents_Rules_Store::parse()` didn't strip a trailing inline `#` comment before matching `User-agent`/`Disallow` lines, so a comment on a wildcard `User-agent` line silently defeated every `Disallow` rule under it (inherited from `Robots_Rules_Store`, which this store was modelled on, but not otherwise touched here).
+- `is_present()` on `Humans_Txt_Store`, `Security_Txt_Store`, `Ads_Txt_Store`, and `App_Ads_Txt_Store` meant "parsed content is non-empty" rather than "a fetch has ever succeeded" -- a successfully-fetched but empty or unparseable file was indistinguishable from one never fetched at all.
+- Assorted efficiency cleanups from code review: the Geo-IP country-delete loop no longer re-queries `Network_Rule_Store::all()` once per removed country; `Security_Txt_Store` memoizes `fields()` per instance instead of re-reading the same option up to three times per render; submitted country codes are deduplicated before diffing.
+
 ## [2.9.76] - 2026-09-04
 
 ### Fixed

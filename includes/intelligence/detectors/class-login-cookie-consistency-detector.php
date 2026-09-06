@@ -39,6 +39,10 @@ final class Login_Cookie_Consistency_Detector extends Detector {
 		return 'login-cookie-consistency';
 	}
 
+	public function description(): string {
+		return __( 'Flags a login submission missing the cookie WordPress sets when it renders the login form -- consistent with scripted credential stuffing that skips loading the page.', 'vcns-security-automation-manager' );
+	}
+
 	public function applicable_surfaces(): array {
 		return array( 'login' );
 	}

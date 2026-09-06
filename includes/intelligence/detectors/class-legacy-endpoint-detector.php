@@ -35,6 +35,10 @@ final class Legacy_Endpoint_Detector extends Pattern_Detector {
 		return 'legacy-endpoints';
 	}
 
+	public function description(): string {
+		return __( 'Flags requests to xmlrpc.php, trackback, and other older WordPress endpoints often targeted for abuse.', 'vcns-security-automation-manager' );
+	}
+
 	public function applicable_surfaces(): array {
 		return array();
 	}

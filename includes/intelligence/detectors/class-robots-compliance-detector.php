@@ -51,6 +51,10 @@ final class Robots_Compliance_Detector extends Detector {
 		return 'robots-compliance';
 	}
 
+	public function description(): string {
+		return __( 'Flags a known crawler/scanner that requests a path your own robots.txt disallows for all crawlers.', 'vcns-security-automation-manager' );
+	}
+
 	public function applicable_surfaces(): array {
 		return array();
 	}

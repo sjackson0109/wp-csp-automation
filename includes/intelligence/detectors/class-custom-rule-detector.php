@@ -63,6 +63,20 @@ class Custom_Rule_Detector extends Pattern_Detector {
 		return 'custom';
 	}
 
+	/** Prefers the admin's own description of this rule; falls back to its pattern, since a bare "custom" row otherwise tells an admin nothing the Detectors tab's Description column doesn't already show for every other family. */
+	public function description(): string {
+		$description = trim( (string) ( $this->rule['description'] ?? '' ) );
+		if ( '' !== $description ) {
+			return $description;
+		}
+
+		return sprintf(
+			/* translators: %s: the rule's own regular expression pattern */
+			__( 'Your custom rule: %s', 'vcns-security-automation-manager' ),
+			(string) ( $this->rule['pattern'] ?? '' )
+		);
+	}
+
 	public function applicable_surfaces(): array {
 		$surfaces = json_decode( (string) ( $this->rule['surfaces'] ?? '' ), true );
 		return is_array( $surfaces ) ? array_values( array_filter( $surfaces, 'is_string' ) ) : array();

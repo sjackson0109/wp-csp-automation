@@ -918,6 +918,23 @@ $status_badge       = static function ( string $status ): void {
 		<p>
 			<?php esc_html_e( 'This is not a single-purpose plugin -- it manages several largely independent layers under one roof, sharing the same admin, audit log, and reason-required decision workflow:', 'vcns-security-automation-manager' ); ?>
 		</p>
+
+		<?php
+		// Built-in only -- excludes one Custom_Rule_Detector instance per
+		// admin-authored row, which the Traffic Controls bullet below
+		// already covers separately ("plus your own custom ... rules").
+		// Computed live rather than hardcoded so this line can't go stale
+		// again the next time a detector family ships, the way the fixed
+		// "nineteen" this replaced already had.
+		$builtin_detector_count = count(
+			array_filter(
+				Detector_Registry::all(),
+				static fn( $detector ) => 'custom' !== $detector->family()
+			)
+		);
+		?>
+
+		<h3><?php esc_html_e( 'Browser & Header Security', 'vcns-security-automation-manager' ); ?></h3>
 		<ul style="list-style: disc; padding-left: 1.5em;">
 			<li>
 				<strong><?php esc_html_e( 'Content Security Policy', 'vcns-security-automation-manager' ); ?></strong>
@@ -934,22 +951,46 @@ $status_badge       = static function ( string $status ): void {
 				&nbsp;&mdash;
 				<?php esc_html_e( 'Reverse Tabnabbing Protection, External Scripts (third-party script/stylesheet governance with Subresource Integrity), and Internal Script Integrity, which modify the rendered page itself rather than emit a header.', 'vcns-security-automation-manager' ); ?>
 			</li>
+		</ul>
+
+		<h3><?php esc_html_e( 'Threat Detection & Traffic Control', 'vcns-security-automation-manager' ); ?></h3>
+		<ul style="list-style: disc; padding-left: 1.5em;">
 			<li>
 				<strong><?php esc_html_e( 'Continuous Intelligence', 'vcns-security-automation-manager' ); ?></strong>
 				&nbsp;&mdash;
-				<?php esc_html_e( 'every request is observed and classified against nineteen built-in detectors covering common attack patterns (SQL injection, path traversal, webshell probes, and more), plus your own custom fail2ban-style regex rules. Recognised bots and crawlers are distinguished from unrecognised traffic without ever assuming "bot" means "hostile" -- recognition is never automatic authorisation, and nothing blocks until you configure it to.', 'vcns-security-automation-manager' ); ?>
+				<?php esc_html_e( 'the record behind every detector below: every request is logged, and known bots, crawlers, and scanners are recognised against a maintained vendor catalogue and distinguished from unrecognised traffic, without ever assuming "unrecognised" means "hostile" -- recognition is never automatic authorisation.', 'vcns-security-automation-manager' ); ?>
+			</li>
+			<li>
+				<strong><?php esc_html_e( 'Traffic Controls & Network Intelligence', 'vcns-security-automation-manager' ); ?></strong>
+				&nbsp;&mdash;
+				<?php
+				printf(
+					/* translators: %d: number of built-in attack detectors, computed live */
+					esc_html__( 'rate limiting and progressive response (warn, throttle, temporary block, extended block) per surface; an explicit IP, ASN, and country allow/block list; %d built-in attack detectors (SQL injection, path traversal, webshell probes, credential stuffing, and more) plus your own custom fail2ban-style regex rules; and Tor exit, ASN, Geo-IP, and well-known-file (robots.txt, security.txt, ads.txt, and more) awareness. All observe-only until you explicitly promote a surface to enforce.', 'vcns-security-automation-manager' ),
+					$builtin_detector_count
+				); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- esc_html__() escapes the translated string; %d is an integer.
+				?>
+			</li>
+		</ul>
+
+		<h3><?php esc_html_e( 'Site Integrity & Recovery', 'vcns-security-automation-manager' ); ?></h3>
+		<ul style="list-style: disc; padding-left: 1.5em;">
+			<li>
+				<strong><?php esc_html_e( 'Advanced Intelligence', 'vcns-security-automation-manager' ); ?></strong>
+				&nbsp;&mdash;
+				<?php esc_html_e( 'coordinated-campaign detection across related sources, configurable honeypath decoys that flag any request to a path no legitimate visitor should ever hit, and declared change windows that distinguish an expected deployment from unexplained drift.', 'vcns-security-automation-manager' ); ?>
 			</li>
 			<li>
 				<strong><?php esc_html_e( 'Baseline & Drift', 'vcns-security-automation-manager' ); ?></strong>
 				&nbsp;&mdash;
 				<?php esc_html_e( "snapshots the site's theme, plugin, and core file state, then flags what changed between snapshots -- so an unexpected file modification doesn't go unnoticed between the deployments you actually meant to make.", 'vcns-security-automation-manager' ); ?>
 			</li>
-			<li>
-				<strong><?php esc_html_e( 'Certificates', 'vcns-security-automation-manager' ); ?></strong>
-				&nbsp;&mdash;
-				<?php esc_html_e( 'a free-standing ACME v2 (Let\'s Encrypt) TLS certificate manager: DNS-01 or HTTP-01 issuance, encrypted-at-rest credentials and private keys, and automatic renewal. Unrelated to the pillars above beyond sharing the same admin and audit plumbing.', 'vcns-security-automation-manager' ); ?>
-			</li>
 		</ul>
+
+		<h3><?php esc_html_e( 'Certificates', 'vcns-security-automation-manager' ); ?></h3>
+		<p>
+			<?php esc_html_e( 'A free-standing ACME v2 (Let\'s Encrypt) TLS certificate manager: DNS-01 or HTTP-01 issuance, encrypted-at-rest credentials and private keys, and automatic renewal. Unrelated to the pillars above beyond sharing the same admin and audit plumbing.', 'vcns-security-automation-manager' ); ?>
+		</p>
 
 		<h2><?php esc_html_e( 'The gap this fills', 'vcns-security-automation-manager' ); ?></h2>
 		<p>

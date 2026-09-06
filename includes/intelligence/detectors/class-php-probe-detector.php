@@ -35,6 +35,10 @@ final class Php_Probe_Detector extends Pattern_Detector {
 		return 'php-probes';
 	}
 
+	public function description(): string {
+		return __( 'Flags requests for exposed PHP diagnostic tools and known remote-code-execution paths (e.g. PHPUnit eval-stdin, Laravel Ignition).', 'vcns-security-automation-manager' );
+	}
+
 	public function applicable_surfaces(): array {
 		return array();
 	}

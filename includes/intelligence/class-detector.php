@@ -37,6 +37,18 @@ abstract class Detector {
 	abstract public function family(): string;
 
 	/**
+	 * One-line, plain-language explanation of what this detector actually
+	 * looks for -- shown in the Detectors tab's own Description column so
+	 * an administrator can judge what enabling/enforcing a family means
+	 * without reading source code. Defaults to '' (rendered as an em dash)
+	 * rather than being abstract, so an extension's own detector never
+	 * fails to register merely for omitting this.
+	 */
+	public function description(): string {
+		return '';
+	}
+
+	/**
 	 * Surfaces this detector should run on.
 	 *
 	 * @return array<string> Subset of 'frontend', 'admin', 'login', 'api'. An empty array means every surface.

@@ -30,6 +30,10 @@ final class Sql_Injection_Detector extends Pattern_Detector {
 		return 'sql-injection';
 	}
 
+	public function description(): string {
+		return __( 'Flags SQL tautologies, stacked queries, and time-based blind-injection syntax (SLEEP/BENCHMARK) in a request.', 'vcns-security-automation-manager' );
+	}
+
 	public function applicable_surfaces(): array {
 		return array();
 	}
