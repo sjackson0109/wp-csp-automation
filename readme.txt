@@ -4,7 +4,7 @@ Tags: security, csp, content security policy, hsts, ssl certificates
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 2.9.76
+Stable tag: 2.9.77
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -114,6 +114,17 @@ The remaining three DNS-01 drivers (acme-dns, PowerDNS, and RFC 2136 dynamic DNS
 When an administrator configures automatic cPanel deployment, once a certificate is successfully issued the plugin sends an HTTPS request to the cPanel host the administrator specifies (cPanel's UAPI SSL::install_ssl endpoint), containing: the cPanel account username and API token supplied by the administrator (as an Authorization header); the domain name; the issued certificate; the certificate chain; and the certificate's private key. This is the one automatic-deployment method that transmits the private key itself, since installing a certificate requires it. Nothing is sent unless cPanel deployment is explicitly configured, and it happens once per issuance or renewal, immediately after the certificate is issued. Because the endpoint is the administrator's own hosting provider, not a service this plugin operates or has a relationship with, no single Terms of Service or Privacy Policy governs it -- those are whatever the administrator's own hosting provider publishes for their account and API access.
 
 == Changelog ==
+
+= 2.9.77 =
+
+* Added: Traffic Controls tracks five more well-known files alongside robots.txt -- agents.txt, security.txt, humans.txt, ads.txt, and app-ads.txt -- each with its own daily-refreshed cache and a "Refresh Now" action; agents.txt also gets a Disallow-rule compliance detector, the same as robots.txt already had.
+* Added: a Geo-IP country block/allow grid (Network Intelligence > Geo-IP) -- every country defaults to Allow, nothing changes until you click Save, and saving a change that would block the requesting administrator's own resolved country (with no covering IP-allow rule) is held behind an explicit "save anyway" confirmation instead of silently locking them out.
+* Added: a Description column on the Detectors tab, and a tooltip explaining what "(fixed)" means next to an observe-only control action.
+* Changed: the Policy tab is now a single compact table instead of four stacked forms; Network Intelligence is split into Tor/ASN/Geo-IP/Well-Known Files/Network Rules sub-tabs; several tabs no longer cap their own width unnecessarily.
+* Changed: the About tab's "What this plugin covers" now mentions Traffic Controls & Network Intelligence and Advanced Intelligence, both previously missing entirely, and its built-in-detector count is computed live instead of a hardcoded number.
+* Fixed: automatic rate-limit escalation could block a loopback address (127.0.0.1/::1) -- wp-cron's and Site Health's own loopback requests were landing in the Blocks list as if they were an attacker. An explicit administrator IP-block rule for a loopback address still applies.
+* Fixed: the Geo-IP self-lockout check silently proceeded (no warning) whenever the Geo-IP lookup for the administrator's own IP failed, and only checked for an admin-surface IP-allow rule rather than the actual surface a block would apply to.
+* Fixed: the short "tagline" description WordPress.org shows in plugin-directory search results and the "Add Plugins" install screen said nothing about file-integrity monitoring (Baseline & Drift) and described rate limiting as "traffic filtering". Updated to "Self-learning security headers, built-in attack detection and rate limiting, file-integrity monitoring, and free TLS certificates. No paywall." (142 characters).
 
 = 2.9.76 =
 
