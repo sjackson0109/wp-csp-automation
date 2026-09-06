@@ -8,7 +8,7 @@ Stable tag: 2.9.76
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Security headers that learn before enforcing so nothing breaks, plus attack detection, traffic filtering, and free TLS certs. No paywall.
+Self-learning security headers, built-in attack detection and rate limiting, file-integrity monitoring, and free TLS certificates. No paywall.
 
 == Description ==
 

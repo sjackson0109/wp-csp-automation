@@ -43,6 +43,10 @@ final class Header_Consistency_Detector extends Detector {
 		return 'header-consistency';
 	}
 
+	public function description(): string {
+		return __( 'Flags a request claiming to be a specific browser but missing a header every real browser sends unconditionally.', 'vcns-security-automation-manager' );
+	}
+
 	public function applicable_surfaces(): array {
 		return array();
 	}

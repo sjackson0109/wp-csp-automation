@@ -27,6 +27,10 @@ final class Ads_Txt_Detector extends Pattern_Detector {
 		return 'ads-txt-visit';
 	}
 
+	public function description(): string {
+		return __( 'Notes when a source checks your ads.txt -- typically an ad-tech crawler verifying authorised sellers.', 'vcns-security-automation-manager' );
+	}
+
 	public function applicable_surfaces(): array {
 		return array();
 	}

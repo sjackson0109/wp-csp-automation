@@ -23,6 +23,10 @@ final class App_Ads_Txt_Detector extends Pattern_Detector {
 		return 'app-ads-txt-visit';
 	}
 
+	public function description(): string {
+		return __( 'Notes when a source checks your app-ads.txt -- typically an ad-tech crawler verifying authorised sellers for mobile-app inventory.', 'vcns-security-automation-manager' );
+	}
+
 	public function applicable_surfaces(): array {
 		return array();
 	}

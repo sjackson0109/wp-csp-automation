@@ -49,6 +49,10 @@ final class Tor_Exit_Detector extends Detector {
 		return 'network-intelligence';
 	}
 
+	public function description(): string {
+		return __( 'Flags requests from a current Tor exit node -- not itself evidence of malicious intent.', 'vcns-security-automation-manager' );
+	}
+
 	public function applicable_surfaces(): array {
 		return array();
 	}

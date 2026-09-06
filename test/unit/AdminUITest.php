@@ -352,6 +352,34 @@ class AdminUITest extends TestCase {
 	}
 
 	/**
+	 * Regression coverage for the About tab's "What this plugin covers"
+	 * section: it must actually mention Traffic Controls and Advanced
+	 * Intelligence (both shipped, top-level pillars that were missing
+	 * entirely before this test existed), and its built-in-detector count
+	 * must be computed live from Detector_Registry rather than a hardcoded
+	 * number that silently goes stale the next time a detector ships.
+	 */
+	public function test_about_tab_mentions_every_pillar_and_computes_the_detector_count_live(): void {
+		$_GET['tab'] = 'about';
+		\WP_SAM\Intelligence\Detector_Registry::reset();
+		\WP_SAM\Intelligence\Detector_Registry::register( new \WP_SAM\Intelligence\Detectors\Sql_Injection_Detector() );
+		\WP_SAM\Intelligence\Detector_Registry::register( new \WP_SAM\Intelligence\Detectors\Html_Injection_Detector() );
+
+		ob_start();
+		require WP_SAM_DIR . 'includes/admin/views/page-overview.php';
+		$output = (string) ob_get_clean();
+
+		unset( $_GET['tab'] );
+		\WP_SAM\Intelligence\Detector_Registry::reset();
+
+		$this->assertStringContainsString( 'Traffic Controls', $output );
+		$this->assertStringContainsString( 'Advanced Intelligence', $output );
+		$this->assertStringContainsString( 'Content Security Policy', $output );
+		$this->assertStringContainsString( 'Certificates', $output );
+		$this->assertStringContainsString( '2 built-in attack detectors', $output );
+	}
+
+	/**
 	 * Regression test for a fatal that reached production: scripts-external.php
 	 * and scripts-internal.php reference namespaced classes (Table_Query,
 	 * Dependency_Governance_Builder) with no `use` import of their own. PHP's

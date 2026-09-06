@@ -37,6 +37,10 @@ final class Agents_Compliance_Detector extends Detector {
 		return 'agents-compliance';
 	}
 
+	public function description(): string {
+		return __( 'Flags a known crawler/scanner that requests a path your own agents.txt disallows for all agents.', 'vcns-security-automation-manager' );
+	}
+
 	public function applicable_surfaces(): array {
 		return array();
 	}

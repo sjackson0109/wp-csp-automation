@@ -45,6 +45,10 @@ final class Http_Method_Detector extends Detector {
 		return 'http-method-intelligence';
 	}
 
+	public function description(): string {
+		return __( 'Classifies OPTIONS requests as a genuine CORS preflight or unexplained -- never treats OPTIONS as malicious on its own.', 'vcns-security-automation-manager' );
+	}
+
 	public function applicable_surfaces(): array {
 		return array();
 	}

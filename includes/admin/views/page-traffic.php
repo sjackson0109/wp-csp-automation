@@ -911,7 +911,7 @@ $tab_help = array(
 		usort( $detectors, static fn( $a, $b ) => strcmp( $a->id(), $b->id() ) );
 		?>
 
-		<p class="description" style="max-width:700px">
+		<p class="description">
 			<?php esc_html_e( 'A detector left on "Observe only" only ever records evidence -- it never contributes to blocking. Switching one to "Enforce" feeds the exact same progressive-response ladder as rate limiting (Warn -> Throttle -> Temporary block -> Extended block), still gated by that surface\'s own Observe/Enforce mode on the Policy tab above. Not every family allows Enforce -- some are reconnaissance signals only, by design.', 'vcns-security-automation-manager' ); ?>
 		</p>
 
@@ -919,12 +919,13 @@ $tab_help = array(
 			<?php wp_nonce_field( 'wp_sam_detector_policy_update' ); ?>
 			<input type="hidden" name="action" value="wp_sam_detector_policy_update" />
 
-			<table class="widefat fixed striped wp-sam-violations-table">
+			<table class="widefat fixed striped wp-sam-violations-table wp-sam-detectors-table">
 				<thead>
 					<tr>
-						<th style="width:220px"><?php esc_html_e( 'Detector', 'vcns-security-automation-manager' ); ?></th>
-						<th style="width:200px"><?php esc_html_e( 'Family', 'vcns-security-automation-manager' ); ?></th>
-						<th style="width:80px"><?php esc_html_e( 'Enabled', 'vcns-security-automation-manager' ); ?></th>
+						<th><?php esc_html_e( 'Detector', 'vcns-security-automation-manager' ); ?></th>
+						<th><?php esc_html_e( 'Family', 'vcns-security-automation-manager' ); ?></th>
+						<th><?php esc_html_e( 'Description', 'vcns-security-automation-manager' ); ?></th>
+						<th><?php esc_html_e( 'Enabled', 'vcns-security-automation-manager' ); ?></th>
 						<th><?php esc_html_e( 'Control action', 'vcns-security-automation-manager' ); ?></th>
 					</tr>
 				</thead>
@@ -934,10 +935,12 @@ $tab_help = array(
 					$allowed      = $detector->allowed_control_actions();
 					$effective    = $detector_policies->control_action_for( $detector );
 					$field_prefix = 'detector[' . $detector->id() . ']';
+					$description  = $detector->description();
 					?>
 					<tr>
 						<td style="white-space:nowrap"><code><?php echo esc_html( $detector->id() ); ?></code></td>
 						<td><?php echo esc_html( $detector->family() ); ?></td>
+						<td><?php echo '' !== $description ? esc_html( $description ) : '&#8212;'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static em-dash literal; $description itself is escaped. ?></td>
 						<td>
 							<input type="checkbox" name="<?php echo esc_attr( $field_prefix ); ?>[enabled]" value="1" <?php checked( $detector_policies->is_enabled( $detector->id() ) ); ?> />
 						</td>
@@ -952,14 +955,19 @@ $tab_help = array(
 							</select>
 							<?php else : ?>
 							<input type="hidden" name="<?php echo esc_attr( $field_prefix ); ?>[control_action]" value="observe" />
-								<?php esc_html_e( 'Observe only (fixed)', 'vcns-security-automation-manager' ); ?>
+								<?php esc_html_e( 'Observe only', 'vcns-security-automation-manager' ); ?>
+								<span class="dashicons dashicons-info-outline wp-sam-meta-icon" tabindex="0">
+									<span class="wp-sam-meta-popover" role="tooltip">
+										<?php esc_html_e( 'Fixed -- this family has no Enforce mode. Either it\'s a benign identity/recognition signal (e.g. Tor exit status, a crawler checking robots.txt) rather than an attack pattern, or being flagged alone isn\'t reliable enough on its own to safely block on.', 'vcns-security-automation-manager' ); ?>
+									</span>
+								</span>
 							<?php endif; ?>
 						</td>
 					</tr>
 				<?php endforeach; ?>
 				<?php if ( empty( $detectors ) ) : ?>
 					<tr>
-						<td colspan="4"><p><?php esc_html_e( 'No detectors registered.', 'vcns-security-automation-manager' ); ?></p></td>
+						<td colspan="5"><p><?php esc_html_e( 'No detectors registered.', 'vcns-security-automation-manager' ); ?></p></td>
 					</tr>
 				<?php endif; ?>
 				</tbody>
@@ -1023,7 +1031,7 @@ $tab_help = array(
 		);
 		?>
 
-		<p class="description" style="max-width:700px">
+		<p class="description">
 			<?php esc_html_e( 'A custom rule is a plain PHP regular expression (with delimiters, e.g. "/wp-config\.bak$/i") matched against one field of every incoming request. A match is recorded as evidence -- like any built-in detector family, it starts in Observe-only mode; switch it to Enforce on the Detectors tab once you trust it. Saving a rule with an invalid pattern is rejected outright, so a typo fails loudly rather than silently matching nothing.', 'vcns-security-automation-manager' ); ?>
 		</p>
 

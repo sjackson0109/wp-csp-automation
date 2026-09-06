@@ -26,6 +26,10 @@ final class Security_Txt_Detector extends Pattern_Detector {
 		return 'security-txt-visit';
 	}
 
+	public function description(): string {
+		return __( 'Notes when a source checks your security.txt -- typically a security researcher or scanner looking for a disclosure contact.', 'vcns-security-automation-manager' );
+	}
+
 	public function applicable_surfaces(): array {
 		return array();
 	}

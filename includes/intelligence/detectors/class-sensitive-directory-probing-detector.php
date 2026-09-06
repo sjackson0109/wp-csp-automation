@@ -27,6 +27,10 @@ final class Sensitive_Directory_Probing_Detector extends Pattern_Detector {
 		return 'sensitive-directories';
 	}
 
+	public function description(): string {
+		return __( 'Flags requests for Unix system paths like /etc/passwd or /proc/self/environ that have no place in a WordPress request.', 'vcns-security-automation-manager' );
+	}
+
 	public function applicable_surfaces(): array {
 		return array();
 	}

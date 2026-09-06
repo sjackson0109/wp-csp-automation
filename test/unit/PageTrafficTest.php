@@ -101,6 +101,26 @@ class PageTrafficTest extends TestCase {
 		$this->assertStringContainsString( 'Notes here', $output );
 	}
 
+	// ── Detectors tab ─────────────────────────────────────────────────────
+
+	public function test_detectors_tab_shows_a_description_and_a_fixed_control_action_tooltip(): void {
+		$_GET['tab'] = 'detectors';
+		\WP_SAM\Intelligence\Detector_Registry::reset();
+		\WP_SAM\Intelligence\Detector_Registry::register( new \WP_SAM\Intelligence\Detectors\Sql_Injection_Detector() );
+		$GLOBALS['_wpdb_get_results'] = array();
+
+		ob_start();
+		require WP_SAM_DIR . 'includes/admin/views/page-traffic.php';
+		$output = (string) ob_get_clean();
+
+		unset( $_GET['tab'] );
+		\WP_SAM\Intelligence\Detector_Registry::reset();
+
+		$this->assertStringContainsString( 'Flags SQL tautologies', $output );
+		$this->assertStringContainsString( 'wp-sam-meta-icon', $output );
+		$this->assertStringContainsString( 'this family has no Enforce mode', $output );
+	}
+
 	// ── Network Intelligence tab -- Network Rules sub-tab ───────────────────
 
 	public function test_network_intelligence_tab_renders_without_a_network_rule(): void {

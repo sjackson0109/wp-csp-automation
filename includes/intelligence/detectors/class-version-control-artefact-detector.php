@@ -27,6 +27,10 @@ final class Version_Control_Artefact_Detector extends Pattern_Detector {
 		return 'version-control-artefacts';
 	}
 
+	public function description(): string {
+		return __( 'Flags requests for .git, .svn, .hg, and dependency lock files that should never be web-accessible.', 'vcns-security-automation-manager' );
+	}
+
 	public function applicable_surfaces(): array {
 		return array();
 	}

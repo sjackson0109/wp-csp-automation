@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       VCNS Security Automation Manager
  * Plugin URI:        https://github.com/vcns/security-automation-manager
- * Description:       Security headers that learn before enforcing so nothing breaks, plus attack detection, traffic filtering, and free TLS certs. No paywall.
+ * Description:       Self-learning security headers, built-in attack detection and rate limiting, file-integrity monitoring, and free TLS certificates. No paywall.
  * Version:           2.9.76
  * Requires at least: 6.4
  * Requires PHP:      8.1

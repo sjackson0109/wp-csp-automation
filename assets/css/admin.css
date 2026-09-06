@@ -703,3 +703,32 @@ details.wp-sam-filter-form form {
 	white-space: nowrap;
 	padding: 2px 0;
 }
+
+/*
+ * Detectors table (Traffic Controls > Detectors): Detector/Family are short
+ * kebab-case identifiers and don't need anywhere near the room a generic
+ * even-width split gives them; Description is the column that actually
+ * needs it, so it's the one left unset to absorb what the others don't.
+ *
+ * Column order: 1 Detector, 2 Family, 3 Description, 4 Enabled,
+ * 5 Control action.
+ */
+.wp-sam-detectors-table th:nth-child(1),
+.wp-sam-detectors-table td:nth-child(1) {
+	width: 150px;
+}
+
+.wp-sam-detectors-table th:nth-child(2),
+.wp-sam-detectors-table td:nth-child(2) {
+	width: 150px;
+}
+
+.wp-sam-detectors-table th:nth-child(4),
+.wp-sam-detectors-table td:nth-child(4) {
+	width: 70px;
+}
+
+.wp-sam-detectors-table th:nth-child(5),
+.wp-sam-detectors-table td:nth-child(5) {
+	width: 240px;
+}

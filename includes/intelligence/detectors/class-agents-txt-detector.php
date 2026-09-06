@@ -25,6 +25,10 @@ final class Agents_Txt_Detector extends Pattern_Detector {
 		return 'agents-txt-visit';
 	}
 
+	public function description(): string {
+		return __( 'Notes when a source checks your agents.txt before crawling -- typically a good sign, not evidence of anything adverse.', 'vcns-security-automation-manager' );
+	}
+
 	public function applicable_surfaces(): array {
 		return array();
 	}

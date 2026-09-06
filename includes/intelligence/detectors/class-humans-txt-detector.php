@@ -25,6 +25,10 @@ final class Humans_Txt_Detector extends Pattern_Detector {
 		return 'humans-txt-visit';
 	}
 
+	public function description(): string {
+		return __( 'Notes when a source checks your humans.txt -- recorded for correlation only.', 'vcns-security-automation-manager' );
+	}
+
 	public function applicable_surfaces(): array {
 		return array();
 	}
