@@ -248,8 +248,19 @@ define( 'WP_SAM_VERSION', '2.9.78' );
  *        every request. ASN/country resolution stays lazy (no live DNS/
  *        API lookup) unless at least one sam_network_rules row exists --
  *        see Intelligence\Traffic_Guard's own docblock.
+ *   v39: no new table -- flips an existing install's default wp_sam_
+ *        reporting_transport from 'report-uri' to 'both' (user-reported
+ *        production incident: an unthrottled violation storm from
+ *        report-uri's one-immediate-request-per-violation behaviour
+ *        exhausted a customer's PHP-FPM worker pool). 'both' still emits
+ *        report-uri as a fallback for browsers without Reporting API
+ *        support; browsers that do support it batch violation delivery via
+ *        report-to instead. See Activator::migrate_default_reporting_
+ *        transport_to_both() for why this is a one-time migration guarded
+ *        by its own completion marker rather than re-applied on every
+ *        future activation.
  */
-define( 'WP_SAM_DB_VERSION', '38' );
+define( 'WP_SAM_DB_VERSION', '39' );
 
 define( 'WP_SAM_FILE', __FILE__ );
 define( 'WP_SAM_DIR', plugin_dir_path( __FILE__ ) );

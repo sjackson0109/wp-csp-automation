@@ -8,6 +8,10 @@
  *   - Stores one row per unique fingerprint, with first/last reported timestamps.
  *   - Increments occurrence_count on duplicate reports using a single database upsert.
  *   - Rate-limits storage: drops reports after 500 per hour per (surface, directive) (soft cap).
+ *   - Rejects a flooding sender before any of the above runs at all, via
+ *     check_not_flooding() wired in as this route's own permission_callback
+ *     (see its own docblock) -- the storage cap above only ever gated what
+ *     got written to the database, not the cost of accepting the request.
  *   - Returns 204 No Content for valid reports (browser expects no body).
  *   - Stores rollup data for administrator review and future export surfaces.
  *   - Flags a likely competing CSP header when a report's disposition doesn't
@@ -18,8 +22,11 @@ declare( strict_types=1 );
 
 namespace WP_SAM\CSP;
 
+use WP_SAM\Intelligence\Ip_Resolver;
+use WP_SAM\Intelligence\Rate_Limiter;
 use WP_SAM\Modules\Audit_Log;
 use WP_SAM\Security\Pillar_Violation_Store;
+use WP_Error;
 use WP_REST_Request;
 use WP_REST_Response;
 
@@ -32,7 +39,21 @@ class Violation_Reporter {
 	private const MAX_PER_HOUR_PER_SURFACE_DIRECTIVE = 500;
 	private const RATE_LIMIT_WINDOW                  = HOUR_IN_SECONDS;
 	private const DISPOSITION_MISMATCH_COOLDOWN      = HOUR_IN_SECONDS;
-	private const LEARNABLE_DIRECTIVES               = array(
+
+	/**
+	 * The existing MAX_PER_HOUR_PER_SURFACE_DIRECTIVE cap above only ever
+	 * gated what got written to the database -- every incoming POST still
+	 * ran a full WP bootstrap + REST dispatch + JSON decode regardless,
+	 * which is what let a report storm exhaust a customer's PHP-FPM worker
+	 * pool (report-uri fires one immediate, unbatched request per
+	 * violation; a page with a dozen newly-blocked resources means a dozen
+	 * simultaneous full-bootstrap requests). This pair is deliberately
+	 * tighter and checked earlier -- see check_not_flooding()'s own
+	 * docblock for where it's wired in.
+	 */
+	private const MAX_REPORTS_PER_IP_PER_WINDOW = 40;
+	private const FLOOD_CHECK_WINDOW            = 10; // seconds
+	private const LEARNABLE_DIRECTIVES          = array(
 		'script-src',
 		'script-src-elem',
 		'style-src',
@@ -58,6 +79,7 @@ class Violation_Reporter {
 	private ?Learning_Window $learning_window;
 	private Policy_Change_Manager $policy_changes;
 	private Pillar_Violation_Store $pillar_violations;
+	private Rate_Limiter $rate_limiter;
 
 	/**
 	 * Per-request cache of surface => expected disposition ('enforce'|'report'|null),
@@ -68,14 +90,46 @@ class Violation_Reporter {
 	 */
 	private array $profile_mode_cache = array();
 
-	public function __construct( Audit_Log $audit, ?Learning_Window $learning_window = null, ?Policy_Change_Manager $policy_changes = null, ?Pillar_Violation_Store $pillar_violations = null ) {
+	public function __construct( Audit_Log $audit, ?Learning_Window $learning_window = null, ?Policy_Change_Manager $policy_changes = null, ?Pillar_Violation_Store $pillar_violations = null, ?Rate_Limiter $rate_limiter = null ) {
 		$this->audit             = $audit;
 		$this->learning_window   = $learning_window;
 		$this->policy_changes    = null !== $policy_changes ? $policy_changes : new Policy_Change_Manager( $audit );
 		$this->pillar_violations = null !== $pillar_violations ? $pillar_violations : new Pillar_Violation_Store();
+		$this->rate_limiter      = null !== $rate_limiter ? $rate_limiter : new Rate_Limiter();
 	}
 
 	// ── REST handler ──────────────────────────────────────────────────────────
+
+	/**
+	 * Cheap, early per-IP circuit breaker against a report-endpoint flood --
+	 * wired in as this route's REST permission_callback (see Plugin::
+	 * register_rest_routes()), so a flooding sender is rejected before
+	 * handle() ever runs its JSON-decode/DB-upsert work, not merely before
+	 * a report gets stored. Reuses Rate_Limiter (the same fixed-window
+	 * counter Traffic_Guard already uses) and Ip_Resolver (the same
+	 * REMOTE_ADDR-only resolution every other caller in this codebase
+	 * trusts) rather than a new ad-hoc mechanism.
+	 *
+	 * An empty resolved IP fails open (returns true): there's no identity
+	 * to flood-check against, and handle() itself still runs the existing
+	 * per-(surface, directive) storage cap regardless.
+	 */
+	public function check_not_flooding(): bool|WP_Error {
+		$ip = Ip_Resolver::resolve();
+		if ( '' === $ip ) {
+			return true;
+		}
+
+		if ( $this->rate_limiter->exceeded( $ip, 'csp_report', self::MAX_REPORTS_PER_IP_PER_WINDOW, self::FLOOD_CHECK_WINDOW ) ) {
+			return new WP_Error(
+				'wp_sam_report_flood',
+				__( 'Too many reports from this address in a short window.', 'vcns-security-automation-manager' ),
+				array( 'status' => 429 )
+			);
+		}
+
+		return true;
+	}
 
 	/**
 	 * Handles POST /sam/v1/report (and the legacy /security-manager/v1/report alias)

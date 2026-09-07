@@ -12,6 +12,7 @@ declare( strict_types=1 );
 use PHPUnit\Framework\TestCase;
 use WP_SAM\CSP\Learning_Window;
 use WP_SAM\CSP\Violation_Reporter;
+use WP_SAM\Intelligence\Rate_Limiter;
 use WP_SAM\Modules\Audit_Log;
 
 class ViolationReporterTest extends TestCase {
@@ -47,6 +48,54 @@ class ViolationReporterTest extends TestCase {
 		$response = $this->reporter->handle( $request );
 
 		$this->assertSame( 204, $response->get_status() );
+	}
+
+	// ── check_not_flooding() -- the early, pre-handle() circuit breaker ─────
+	//
+	// Rate_Limiter is `final` (can't be doubled by PHPUnit's mock generator),
+	// so these use a real instance with the transient store pre-seeded
+	// directly -- the same convention TrafficGuardTest already uses for
+	// Rate_Limiter-backed checks. Key format matches Rate_Limiter::
+	// transient_key(): 'wp_sam_rate_' . $surface . '_' . md5( $ip ).
+
+	public function test_check_not_flooding_allows_under_the_threshold(): void {
+		$_SERVER['REMOTE_ADDR'] = '203.0.113.42';
+		$reporter               = new Violation_Reporter( $this->audit, null, null, null, new Rate_Limiter() );
+
+		$result = $reporter->check_not_flooding();
+
+		$this->assertTrue( $result );
+		unset( $_SERVER['REMOTE_ADDR'] );
+	}
+
+	public function test_check_not_flooding_rejects_over_the_threshold_with_a_429(): void {
+		$_SERVER['REMOTE_ADDR']                                              = '203.0.113.42';
+		$GLOBALS['_wp_transients'][ 'wp_sam_rate_csp_report_' . md5( '203.0.113.42' ) ] = 40; // Already at the cap.
+		$reporter = new Violation_Reporter( $this->audit, null, null, null, new Rate_Limiter() );
+
+		$result = $reporter->check_not_flooding();
+
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( 429, $result->get_error_data()['status'] );
+		unset( $_SERVER['REMOTE_ADDR'] );
+	}
+
+	public function test_check_not_flooding_is_scoped_per_ip(): void {
+		$GLOBALS['_wp_transients'][ 'wp_sam_rate_csp_report_' . md5( '203.0.113.42' ) ] = 40; // A different IP is already at the cap...
+
+		$_SERVER['REMOTE_ADDR'] = '198.51.100.7'; // ...this one is not.
+		$reporter               = new Violation_Reporter( $this->audit, null, null, null, new Rate_Limiter() );
+
+		$this->assertTrue( $reporter->check_not_flooding() );
+		unset( $_SERVER['REMOTE_ADDR'] );
+	}
+
+	public function test_check_not_flooding_fails_open_with_no_resolvable_ip(): void {
+		unset( $_SERVER['REMOTE_ADDR'] );
+		$reporter = new Violation_Reporter( $this->audit, null, null, null, new Rate_Limiter() );
+
+		$this->assertTrue( $reporter->check_not_flooding() );
+		$this->assertSame( array(), $GLOBALS['_wp_transients'] ?? array(), 'An unresolvable IP must not even attempt to record a hit.' );
 	}
 
 	public function test_reports_json_content_type_is_accepted(): void {

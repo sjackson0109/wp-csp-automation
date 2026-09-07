@@ -43,7 +43,41 @@ class ActivatorTest extends TestCase {
 		$this->assertSame( '', get_option( 'wp_sam_report_endpoint_url' ) );
 	}
 
-	public function test_activate_seeds_direct_reporting_transport(): void {
+	/**
+	 * 'both', not 'report-uri' alone, as of schema v39 -- see
+	 * Activator::migrate_default_reporting_transport_to_both()'s own
+	 * docblock (a report-uri-only default let one unthrottled violation
+	 * storm exhaust a customer's PHP-FPM worker pool in production).
+	 */
+	public function test_activate_seeds_both_reporting_transports_on_a_fresh_install(): void {
+		Activator::activate();
+
+		$this->assertSame( 'both', get_option( 'wp_sam_reporting_transport' ) );
+	}
+
+	public function test_activate_migrates_an_existing_report_uri_only_install_to_both(): void {
+		update_option( 'wp_sam_reporting_transport', 'report-uri' );
+
+		Activator::activate();
+
+		$this->assertSame( 'both', get_option( 'wp_sam_reporting_transport' ) );
+	}
+
+	public function test_activate_does_not_override_an_explicitly_chosen_transport(): void {
+		update_option( 'wp_sam_reporting_transport', 'report-to' );
+
+		Activator::activate();
+
+		$this->assertSame( 'report-to', get_option( 'wp_sam_reporting_transport' ) );
+	}
+
+	public function test_reporting_transport_migration_does_not_reapply_after_an_admin_switches_back(): void {
+		// Simulates: upgrade (migrates to 'both') -> admin deliberately
+		// switches back to 'report-uri' -> some later, unrelated activate()
+		// call (e.g. a future schema bump) must not silently revert it.
+		Activator::activate();
+		update_option( 'wp_sam_reporting_transport', 'report-uri' );
+
 		Activator::activate();
 
 		$this->assertSame( 'report-uri', get_option( 'wp_sam_reporting_transport' ) );
