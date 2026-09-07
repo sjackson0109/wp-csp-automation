@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows semantic versioning for plugin releases.
 
+## [2.9.82] - 2026-09-07
+
+### Fixed
+
+- Closed 3 of the concrete test-coverage gaps identified against GitHub issue #159's 18-scenario release-verification checklist (`GithubUpdateCheckerTest.php`):
+  - Scenario 11 (reject an insecure package URL): `is_allowed_package_url()` already checked `'https' === $scheme`, but no test exercised an `http://` URL specifically -- the only URL-shape test previously covered path traversal, not scheme. Added `test_non_https_download_url_does_not_offer_update()`.
+  - Scenario 17 (expired WordPress transients): the test transient stub has no TTL model at all, so this can only honestly prove what expiry ultimately reduces to at the code level -- `get_transient()` returning `false` (exactly what real WordPress returns once a transient has actually expired) correctly falls through to a fresh `wp_remote_get()`-driven check rather than being mistaken for a cached result. Added `test_a_missing_or_expired_cache_entry_triggers_a_fresh_manifest_fetch()`.
+  - Scenario 18 (cached update metadata): added `test_a_cached_manifest_is_honoured_without_a_fresh_fetch()`, asserting a pre-seeded cache entry is used without any `wp_remote_get()` call occurring.
+  - Scenarios 5/6/7 (WP-UI-triggered upgrade, true background-update integration) remain explicitly out of scope -- they need real WordPress infrastructure beyond what unit tests or `release-verification.yml` currently drive.
+
 ## [2.9.81] - 2026-09-07
 
 ### Fixed
