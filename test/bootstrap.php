@@ -36,27 +36,6 @@ define( 'ARRAY_A',               'ARRAY_A' );
 define( 'ARRAY_N',               'ARRAY_N' );
 define( 'OBJECT',                'OBJECT' );
 
-// ── PSR-4 autoloader (mirrors security-automation-manager.php) ─────────────────────────
-spl_autoload_register( static function ( string $class ): void {
-	$prefix = 'WP_SAM\\';
-	if ( strncmp( $prefix, $class, strlen( $prefix ) ) !== 0 ) {
-		return;
-	}
-	$relative = substr( $class, strlen( $prefix ) );
-	$parts    = explode( '\\', $relative );
-	$filename = 'class-' . strtolower( str_replace( '_', '-', (string) array_pop( $parts ) ) ) . '.php';
-	$subdir   = ! empty( $parts ) ? strtolower( implode( '/', $parts ) ) . '/' : '';
-	$file     = WP_SAM_DIR . 'includes/' . $subdir . $filename;
-	if ( ! is_readable( $file ) ) {
-		$file = WP_SAM_DIR . 'offline/' . $subdir . $filename;
-	}
-	if ( is_readable( $file ) ) {
-		require_once $file;
-	} else {
-		trigger_error( "WP_SAM test autoloader: cannot resolve {$class}", E_USER_NOTICE );
-	}
-} );
-
 // ── WordPress function stubs ──────────────────────────────────────────────────
 // These are minimal implementations that satisfy the function signatures
 // called by the classes under test. They do not replicate WordPress behaviour
@@ -1160,6 +1139,39 @@ function wp_test_reset_globals(): void {
 
 // Initialise globals so classes loaded at parse time do not hit undefined array errors.
 wp_test_reset_globals();
+
+// ── PSR-4 autoloader (mirrors security-automation-manager.php) ─────────────────────────
+// Registered here -- immediately before the stub requires below, rather than
+// at the top of the file as before -- so there is no longer any window
+// between registration and first use where a WP_SAM\* class touched by one
+// of the WordPress-only stubs above could load the real production class
+// instead of a stub (GitHub issue #164, code-review-findings.json). It can't
+// move later than this: Stub_Policy_Data_Loader.php below implements the
+// real WP_SAM\CSP\Policy_Data_Loader interface, so the autoloader must
+// already be active by the time that file is required.
+spl_autoload_register( static function ( string $class ): void {
+	$prefix = 'WP_SAM\\';
+	if ( strncmp( $prefix, $class, strlen( $prefix ) ) !== 0 ) {
+		return;
+	}
+	$relative = substr( $class, strlen( $prefix ) );
+	$parts    = explode( '\\', $relative );
+	$filename = 'class-' . strtolower( str_replace( '_', '-', (string) array_pop( $parts ) ) ) . '.php';
+	$subdir   = ! empty( $parts ) ? strtolower( implode( '/', $parts ) ) . '/' : '';
+	$file     = WP_SAM_DIR . 'includes/' . $subdir . $filename;
+	if ( ! is_readable( $file ) ) {
+		$file = WP_SAM_DIR . 'offline/' . $subdir . $filename;
+	}
+	if ( is_readable( $file ) ) {
+		require_once $file;
+	} else {
+		// A notice-level trigger_error() doesn't fail a PHPUnit run by
+		// default, so an unresolvable class would silently pass CI right up
+		// until something first tried to instantiate it. Throwing here fails
+		// the specific test that touched this class immediately instead.
+		throw new \RuntimeException( "WP_SAM test autoloader: cannot resolve {$class}" );
+	}
+} );
 
 // ── Test stubs ────────────────────────────────────────────────────────────────
 // Load namespace-scoped stubs before any plugin class that might define the

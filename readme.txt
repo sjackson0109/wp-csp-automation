@@ -4,7 +4,7 @@ Tags: security, csp, content security policy, hsts, ssl certificates
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 2.9.80
+Stable tag: 2.9.81
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -115,6 +115,10 @@ When an administrator configures automatic cPanel deployment, once a certificate
 
 == Changelog ==
 
+= 2.9.81 =
+
+* Fixed: `code-review-findings.json`'s 10 retained findings had no disposition metadata even though most had already been resolved by later issues (GitHub issue #164) -- each entry now records whether it's resolved (and by which issue) or was fixed directly in this release. Also closed the two findings that were still genuinely open: the test bootstrap's autoloader is now registered immediately before the stubs that need it, closing the window where a stub could be silently bypassed, and an unresolvable test class now throws immediately instead of only logging a notice PHPUnit doesn't fail on by default.
+
 = 2.9.80 =
 
 * Fixed: the CSP dashboard queried the policy-profiles, last-50-violations, and scan-log tables unconditionally on every page load regardless of which tab was open (GitHub issue #166) -- viewing e.g. Settings or Start Here still fired three unneeded queries. Profiles and violations queries are now scoped to only the tabs that actually use them; the scan-log query is scoped to the Scan Log tab.
@@ -181,9 +185,5 @@ When an administrator configures automatic cPanel deployment, once a certificate
 = 2.9.66 =
 
 * Added: Custom Rules -- your own regex-based detection rules, similar to a fail2ban filter (Traffic Controls -> Custom Rules). Give a rule a name, a PHP-style regular expression, which part of the request to match it against (request URI, path, query string, or User-Agent), a severity, and optionally limit it to specific surfaces. A saved rule appears automatically on the Detectors tab, exactly like a built-in detector family, so it can be enabled/disabled and opted into enforcement the same way -- it starts in Observe-only mode by default. Includes a "Test a pattern" tool to check a pattern against a sample value without saving anything. A pattern that doesn't compile is rejected at save time rather than silently matching nothing.
-
-= 2.9.65 =
-
-* Fixed: several documentation files had drifted from the current codebase (GitHub issue #163) -- SECURITY.md's supported-versions table still named a years-old release line (now an evergreen "latest version only" policy that can't go stale the same way again); COMMERCIAL_TERMS.md still referred to the plugin by its pre-rename name, "CSP Automation Manager"; docs/architecture.md and docs/testing-and-quality.md still referenced database table and option names renamed away in schema v9; docs/database-schema.md's version history table stopped at schema v12 while the plugin has shipped 24 schema versions since. All corrected, and extended the automated documentation-consistency test suite so drift like this is caught by CI going forward rather than found by manual audit again.
 
 Full changelog history: https://github.com/vcns/security-automation-manager/blob/main/CHANGELOG.md
