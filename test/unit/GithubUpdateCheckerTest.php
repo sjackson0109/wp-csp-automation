@@ -92,6 +92,79 @@ class GithubUpdateCheckerTest extends TestCase {
 		$this->assertSame( array(), $result->no_update );
 	}
 
+	public function test_non_https_download_url_does_not_offer_update(): void {
+		$manifest                 = $this->manifest( $this->newer_version() );
+		$manifest['download_url'] = 'http://vcns.github.io/wp-updates/security-automation-manager/security-automation-manager-github-v' . $manifest['version'] . '.zip';
+
+		$GLOBALS['_wp_remote_get_response'] = $this->response( $manifest );
+
+		$checker   = new Github_Update_Checker();
+		$transient = (object) array(
+			'checked'   => array( WP_SAM_PLUGIN_BASENAME => WP_SAM_VERSION ),
+			'response'  => array(),
+			'no_update' => array(),
+		);
+
+		$result = $checker->inject_update( $transient );
+
+		$this->assertSame( array(), $result->response );
+		$this->assertSame( array(), $result->no_update );
+	}
+
+	// GitHub issue #159, release-verification scenario #17 ("expired
+	// transients"). The test wpdb/transient stub has no TTL model at all --
+	// set_transient() ignores its $expiration argument entirely -- so this
+	// can only honestly prove what expiry ultimately reduces to at the code
+	// level: get_transient() returning false (exactly what real WordPress
+	// returns once a transient has actually expired, since an expired
+	// transient is deleted, not merely marked stale) falls through to a
+	// fresh wp_remote_get()-driven check rather than being mistaken for a
+	// cached result. It does not exercise real time-based expiration.
+	public function test_a_missing_or_expired_cache_entry_triggers_a_fresh_manifest_fetch(): void {
+		unset( $GLOBALS['_wp_transients']['wp_sam_github_update_info'] );
+
+		$newer_version                      = $this->newer_version();
+		$GLOBALS['_wp_remote_get_response'] = $this->response( $this->manifest( $newer_version ) );
+
+		$checker   = new Github_Update_Checker();
+		$transient = (object) array(
+			'checked'   => array( WP_SAM_PLUGIN_BASENAME => WP_SAM_VERSION ),
+			'response'  => array(),
+			'no_update' => array(),
+		);
+
+		$result = $checker->inject_update( $transient );
+
+		$item = $result->response[ WP_SAM_PLUGIN_BASENAME ] ?? null;
+		$this->assertIsObject( $item );
+		$this->assertSame( $newer_version, $item->new_version );
+	}
+
+	// GitHub issue #159, release-verification scenario #18 ("cached update
+	// metadata"). No $GLOBALS['_wp_remote_get_response'] is set here on
+	// purpose: if get_remote_info() didn't honour the cache and fell through
+	// to wp_remote_get() anyway, the stub's default (empty) response would
+	// fail manifest validation and this assertion would fail.
+	public function test_a_cached_manifest_is_honoured_without_a_fresh_fetch(): void {
+		$newer_version = $this->newer_version();
+		$GLOBALS['_wp_transients']['wp_sam_github_update_info'] = array(
+			'data' => (object) $this->manifest( $newer_version ),
+		);
+
+		$checker   = new Github_Update_Checker();
+		$transient = (object) array(
+			'checked'   => array( WP_SAM_PLUGIN_BASENAME => WP_SAM_VERSION ),
+			'response'  => array(),
+			'no_update' => array(),
+		);
+
+		$result = $checker->inject_update( $transient );
+
+		$item = $result->response[ WP_SAM_PLUGIN_BASENAME ] ?? null;
+		$this->assertIsObject( $item );
+		$this->assertSame( $newer_version, $item->new_version );
+	}
+
 	public function test_plugin_information_modal_uses_manifest_sections(): void {
 		$newer_version                      = $this->newer_version();
 		$GLOBALS['_wp_remote_get_response'] = $this->response( $this->manifest( $newer_version ) );

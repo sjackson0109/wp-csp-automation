@@ -4,7 +4,7 @@ Tags: security, csp, content security policy, hsts, ssl certificates
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 2.9.81
+Stable tag: 2.9.82
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -115,6 +115,10 @@ When an administrator configures automatic cPanel deployment, once a certificate
 
 == Changelog ==
 
+= 2.9.82 =
+
+* Fixed: three release-verification test gaps closed (GitHub issue #159) -- a dedicated test now covers the update checker's HTTPS-only package URL rule (previously only exercised indirectly by a path-traversal test), a missing or expired manifest cache entry correctly falls through to a fresh check instead of being treated as a result, and a cached manifest is honoured without an unnecessary re-fetch.
+
 = 2.9.81 =
 
 * Fixed: `code-review-findings.json`'s 10 retained findings had no disposition metadata even though most had already been resolved by later issues (GitHub issue #164) -- each entry now records whether it's resolved (and by which issue) or was fixed directly in this release. Also closed the two findings that were still genuinely open: the test bootstrap's autoloader is now registered immediately before the stubs that need it, closing the window where a stub could be silently bypassed, and an unresolvable test class now throws immediately instead of only logging a notice PHPUnit doesn't fail on by default.
@@ -181,9 +185,5 @@ When an administrator configures automatic cPanel deployment, once a certificate
 = 2.9.67 =
 
 * Added: plain-language explainer text on the Settings/Overview page (Overview, Readiness, and Security Health tabs) -- each of the five status layers, and the readiness and health checks below them, now has a short paragraph explaining what it covers, why it matters, and what a Fail or Warning actually means in practice. First installment of a wider documentation pass across the admin UI aimed at making the plugin approachable to administrators without a security background, not just to people who already know what CSP, MIME-sniffing, or clickjacking mean.
-
-= 2.9.66 =
-
-* Added: Custom Rules -- your own regex-based detection rules, similar to a fail2ban filter (Traffic Controls -> Custom Rules). Give a rule a name, a PHP-style regular expression, which part of the request to match it against (request URI, path, query string, or User-Agent), a severity, and optionally limit it to specific surfaces. A saved rule appears automatically on the Detectors tab, exactly like a built-in detector family, so it can be enabled/disabled and opted into enforcement the same way -- it starts in Observe-only mode by default. Includes a "Test a pattern" tool to check a pattern against a sample value without saving anything. A pattern that doesn't compile is rejected at save time rather than silently matching nothing.
 
 Full changelog history: https://github.com/vcns/security-automation-manager/blob/main/CHANGELOG.md
