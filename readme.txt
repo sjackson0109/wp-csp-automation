@@ -4,7 +4,7 @@ Tags: security, csp, content security policy, hsts, ssl certificates
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 2.9.84
+Stable tag: 2.9.85
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -115,6 +115,10 @@ When an administrator configures automatic cPanel deployment, once a certificate
 
 == Changelog ==
 
+= 2.9.85 =
+
+* Added: configuration snapshots (Settings/Overview > Recovery, GitHub issue #180) now also cover time-bound exceptions and the automation-posture setting, alongside the policy/source/pillar/dependency/certificate tables they already covered. Each restorable snapshot now has a "Preview what this would overwrite" disclosure showing row counts and included options before you confirm, and a restore that can't fully complete (a table in the snapshot missing from the live database) is now reported as a partial restore rather than an unqualified success.
+
 = 2.9.84 =
 
 * Added: promoting a CSP surface to enforce mode now requires a written reason (GitHub issue #179), and passes three more automated checks before it's allowed: no active exception covering that surface (see the new Exceptions tab), no source candidates still awaiting an approve/reject decision, and no competing Content-Security-Policy header detected in the last 48 hours. Existing checks (approved sources/hashes present, no recent violations) are unchanged.
@@ -181,9 +185,5 @@ When an administrator configures automatic cPanel deployment, once a certificate
 = 2.9.70 =
 
 * Added: the public GitHub Pages help site's landing page (docs/index.html) now explains what Content Security Policy actually defends against -- cross-site scripting (XSS) -- rather than only describing how the plugin's rollout workflow behaves. The ten-pillar card grid also gained a short "why this matters" clause per header (e.g. what clickjacking is, why a leaking Referer header is a privacy problem) instead of listing configuration mechanics alone. First installment of extending the UI documentation retrofit to the public docs site.
-
-= 2.9.69 =
-
-* Added: plain-language explainer text on the Content Security Policy dashboard's Profiles, For Review, Policy Audit, Violations, Scan Log, and Settings tabs. Second installment of the UI documentation retrofit -- explains what each tab's data actually means and why it matters (e.g. why Occurrences never resets, what a "scan" actually checks, what the Trusted Types and Bypass Best Practices toggles are for) rather than leaving the reader to infer it from column headers and filter fields alone. Start Here already had this treatment and was left unchanged.
 
 Full changelog history: https://github.com/vcns/security-automation-manager/blob/main/CHANGELOG.md

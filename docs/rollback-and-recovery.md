@@ -40,17 +40,33 @@ provide, automatically:
 3. **Snapshots configuration state before every forward migration.**
    Immediately before schema N → N+1 runs, every row of the config-state
    tables (CSP policy profiles, source/hash approvals, the other header
-   pillars' profiles, dependency/SRI classifications, certificate records)
-   is captured into `sam_migration_snapshots`, keeping the last 5. This
-   deliberately excludes the audit log and other log-shaped tables --
-   nothing ever overwrites those, so they need no snapshot.
-4. **Lets you restore a snapshot** from **Security Automation Manager →
-   Recovery → Rollback and Recovery**, but only when the
-   running code's schema still matches exactly what that snapshot was taken
-   for. This undoes a migration's *data* effects (e.g. a default that
-   changed in a way you don't want) while staying on current code. It
-   cannot restore across a schema change to a different code version --
-   that case is refused with a clear reason, not attempted partially.
+   pillars' profiles, dependency/SRI classifications, certificate records,
+   and, since schema v40, time-bound exceptions) is captured into
+   `sam_migration_snapshots`, along with a small set of configuration-shaped
+   options (currently: automation posture) -- see `Rollback_Guard::
+   SNAPSHOT_TABLE_SUFFIXES`/`SNAPSHOT_OPTION_NAMES`. This deliberately
+   excludes the audit log and other log-shaped tables (including the
+   policy-change-decision ledger -- an append-only approval history, not
+   restorable configuration) -- nothing ever overwrites those, so they need
+   no snapshot.
+4. **Lets you preview, then restore, a snapshot** from **Security Automation
+   Manager → Recovery → Rollback and Recovery**, but only when the running
+   code's schema still matches exactly what that snapshot was taken for.
+   Each restorable snapshot has a "Preview what this would overwrite"
+   disclosure showing the row count per table and which options are
+   included, before you confirm. Restoring undoes a migration's *data*
+   effects (e.g. a default that changed in a way you don't want) while
+   staying on current code.
+
+   This cannot restore across a schema change to a different code
+   version -- that case is refused outright with a clear reason, not
+   attempted partially. Within a same-schema restore, though, a genuine
+   partial outcome is possible and is reported as such (not as an
+   unqualified success): if a table present in the snapshot's own data is
+   missing from the live database (an unusual state, not merely an older
+   snapshot that predates a newer table), that one table is skipped and the
+   admin notice names it, while every other table and option in the
+   snapshot still restores normally.
 
 ## Deciding whether you need this document at all
 

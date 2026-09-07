@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows semantic versioning for plugin releases.
 
+## [2.9.85] - 2026-09-07
+
+### Added
+
+- Configuration snapshot/restore (GitHub issue #180): `Rollback_Guard::SNAPSHOT_TABLE_SUFFIXES` gains `sam_exceptions` (real since #177), and a new `SNAPSHOT_OPTION_NAMES` constant (`wp_sam_automation_config`) extends `snapshot_before_migration()`/`restore_snapshot()` to also capture and restore configuration-shaped options, not just table rows. New `Rollback_Guard::snapshot_contents()` powers a "Preview what this would overwrite" disclosure on the Recovery tab (row count per table, included options) before an administrator confirms a restore -- the roadmap's "preview the restore" requirement. `restore_snapshot()` now distinguishes a genuine partial restore (a table present in the snapshot's own data but missing from the live database -- an unusual state, not merely an older snapshot predating a newer table) from an unqualified success, surfaced as its own notice on the Recovery tab. `sam_policy_change_decisions` ("approval decisions") and external-verification targets remain deliberately excluded -- documented explicitly in `Rollback_Guard`'s own class docblock and `docs/rollback-and-recovery.md`, along with a correction to `docs/security-controls-inventory.md`'s pre-existing (and already-incorrect before this change) claim that `sam_dependency_inventory` wasn't covered by the snapshot mechanism.
+
 ## [2.9.84] - 2026-09-07
 
 ### Added

@@ -598,6 +598,13 @@ $status_badge       = static function ( string $status ): void {
 	<div class="notice notice-success is-dismissible">
 		<p><?php esc_html_e( 'Configuration snapshot restored.', 'vcns-security-automation-manager' ); ?></p>
 	</div>
+	<?php elseif ( 'partial' === $restore_result ) : ?>
+	<div class="notice notice-warning is-dismissible">
+		<p>
+			<?php esc_html_e( 'Snapshot restored, but one or more tables in it were missing from the live database and could not be restored:', 'vcns-security-automation-manager' ); ?>
+			<?php echo '' !== $restore_reason ? esc_html( $restore_reason ) : ''; ?>
+		</p>
+	</div>
 	<?php elseif ( 'failed' === $restore_result ) : ?>
 	<div class="notice notice-error is-dismissible">
 		<p>
@@ -615,7 +622,7 @@ $status_badge       = static function ( string $status ): void {
 		printf(
 			wp_kses(
 				/* translators: %s: link to the rollback and recovery documentation */
-				__( 'Snapshots cover policy profiles, source/hash approvals, other pillar profiles, dependency classifications, and certificate records -- never the audit log or violation history, which are append-only and never overwritten. For anything beyond what\'s here, including swapping plugin code itself, see %s.', 'vcns-security-automation-manager' ),
+				__( 'Snapshots cover policy profiles, source/hash approvals, other pillar profiles, dependency classifications, certificate records, time-bound exceptions, and the automation-posture option -- never the audit log, violation history, or policy-change decision ledger, which are append-only and never overwritten. For anything beyond what\'s here, including swapping plugin code itself, see %s.', 'vcns-security-automation-manager' ),
 				array(
 					'a' => array(
 						'href'   => array(),
@@ -655,6 +662,29 @@ $status_badge       = static function ( string $status ): void {
 				</td>
 				<td>
 					<?php if ( $snapshot['restorable'] ) : ?>
+						<?php $snapshot_contents = Rollback_Guard::snapshot_contents( $snapshot['id'] ); ?>
+						<?php if ( ! empty( $snapshot_contents ) ) : ?>
+					<details style="margin-bottom:.5em">
+						<summary style="cursor:pointer"><?php esc_html_e( 'Preview what this would overwrite', 'vcns-security-automation-manager' ); ?></summary>
+						<ul style="margin:.5em 0 0 1.5em;list-style:disc">
+							<?php foreach ( $snapshot_contents['tables'] as $table_suffix => $row_count ) : ?>
+							<li>
+								<?php
+								printf(
+									/* translators: 1: table name, 2: number of rows */
+									esc_html( _n( '%1$s: %2$d row', '%1$s: %2$d rows', $row_count, 'vcns-security-automation-manager' ) ),
+									esc_html( $table_suffix ),
+									(int) $row_count
+								);
+								?>
+							</li>
+							<?php endforeach; ?>
+							<?php if ( ! empty( $snapshot_contents['options'] ) ) : ?>
+							<li><?php echo esc_html( sprintf( /* translators: %s: comma-separated option names */ __( 'Options: %s', 'vcns-security-automation-manager' ), implode( ', ', $snapshot_contents['options'] ) ) ); ?></li>
+							<?php endif; ?>
+						</ul>
+					</details>
+					<?php endif; ?>
 					<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="display:flex;align-items:center;gap:.5em;">
 						<?php wp_nonce_field( 'wp_sam_restore_snapshot' ); ?>
 						<input type="hidden" name="action" value="wp_sam_restore_snapshot">
