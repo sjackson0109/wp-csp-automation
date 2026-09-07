@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows semantic versioning for plugin releases.
 
+## [2.9.79] - 2026-09-07
+
+### Fixed
+
+- A customer's WP Engine site suffered PHP-FPM worker pool exhaustion (two outages in one morning, verified against the actual installed version, v2.4.14) because the CSP violation-report REST endpoint (`/sam/v1/report`) had no request-level throttle, and the default reporting transport (`report-uri`, `Policy_Builder::REPORTING_TRANSPORT_DIRECT`) fires one immediate, unbatched HTTP request per browser-side violation regardless of CSP mode (report-only and enforce generate identical violation-report traffic). A report-only policy that hadn't yet learned a page's real needs could fire a dozen-plus simultaneous full-bootstrap requests from a single page load.
+- Default reporting transport is now `both` (`report-uri` retained as a fallback for browsers without Reporting API support, `report-to` added so supporting browsers batch violation delivery instead of firing one request per violation). Schema v39 migrates existing installs still on the untouched `report-uri` default via a one-time completion marker, so an administrator who deliberately switches back to `report-uri` later isn't silently reverted by some unrelated future schema bump.
+- New `Violation_Reporter::check_not_flooding()` early per-IP circuit breaker, reusing the existing `Rate_Limiter`/`Ip_Resolver` utilities `Traffic_Guard` already relies on, wired in as the report REST route's own `permission_callback` -- a flooding sender is rejected with a 429 before `handle()`'s JSON-decode/DB-upsert work ever runs. Deliberately separate from and tighter than the existing 500/hour storage cap, which only ever gated what got written to the database, not what got accepted.
+- Corrected `architecture.md`, `security-controls-inventory.md`, `faq.html`, and `database-schema.md`, which documented the old report-uri-only default and the storage cap as sufficient mitigation for "high-volume reports" -- that framing was the blind spot that let this incident happen silently.
+
+Part A of a 4-part remediation; loopback-scan concurrency/timeouts, scan diagnostics, and load-test tooling follow in subsequent releases.
+
 ## [2.9.78] - 2026-09-07
 
 ### Fixed
