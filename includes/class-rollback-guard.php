@@ -19,9 +19,10 @@
  *      site forward, not backward.
  *   2. snapshot_before_migration() -- captures every row of the
  *      config-state tables (never log/ledger tables -- those are already
- *      preserved by simply never being touched) immediately before a
- *      forward migration runs, so a migration whose data effects turn out
- *      to be unwanted can be undone without reinstalling old code.
+ *      preserved by simply never being touched), plus a handful of
+ *      configuration-shaped options (SNAPSHOT_OPTION_NAMES), immediately
+ *      before a forward migration runs, so a migration whose data effects
+ *      turn out to be unwanted can be undone without reinstalling old code.
  *   3. restore_snapshot() -- restores a snapshot, but only when the
  *      running code's schema version still matches the snapshot's
  *      to_version exactly. A snapshot taken for schema 22 cannot be
@@ -30,6 +31,16 @@
  *      guessing at defaults would be exactly the kind of silent, unsafe
  *      behaviour rollback support exists to avoid. That case returns a
  *      clear refusal instead of a partial, silently-wrong restore.
+ *
+ * GitHub issue #180 asked this to cover "the full set of plugin state."
+ * Two categories are deliberately still excluded, not overlooked:
+ *   - sam_policy_change_decisions ("approval decisions") is an append-only
+ *     audit ledger by design, like sam_audit_log itself -- restorable
+ *     configuration state, not something a restore should rewrite.
+ *   - "Exceptions" (now sam_exceptions, above) and "verification targets"
+ *     were both unbuilt when this issue was written; exceptions are
+ *     covered now that #177 shipped, verification targets remain excluded
+ *     pending #182 (external verification service, still unbuilt).
  */
 
 declare( strict_types=1 );
@@ -66,6 +77,18 @@ class Rollback_Guard {
 		'sam_pillar_profiles',
 		'sam_dependency_inventory',
 		'sam_certificates',
+		'sam_exceptions',
+	);
+
+	/**
+	 * Options snapshotted and restored alongside the tables above (GitHub
+	 * issue #180) -- "automation posture" is genuinely configuration state,
+	 * not a table row, so it needs its own, separate handling in
+	 * snapshot_before_migration()/restore_snapshot() rather than living in
+	 * SNAPSHOT_TABLE_SUFFIXES.
+	 */
+	public const SNAPSHOT_OPTION_NAMES = array(
+		'wp_sam_automation_config',
 	);
 
 	/**
@@ -170,6 +193,16 @@ class Rollback_Guard {
 			$data[ $suffix ] = is_array( $rows ) ? $rows : array();
 		}
 
+		$options = array();
+		foreach ( self::SNAPSHOT_OPTION_NAMES as $option_name ) {
+			// A missing option (never saved yet) is recorded as null rather
+			// than omitted, so restore_snapshot() can still distinguish "not
+			// set at snapshot time" from "not part of this snapshot at all"
+			// (an older snapshot taken before this option name existed).
+			$options[ $option_name ] = get_option( $option_name, null );
+		}
+		$data['options'] = $options;
+
 		$snapshot_table = $wpdb->prefix . 'sam_migration_snapshots';
 		if ( ! self::table_exists( $snapshot_table ) ) {
 			return; // v22->v23 upgrade path: the snapshot table itself doesn't exist until this migration creates it.
@@ -241,13 +274,67 @@ class Rollback_Guard {
 	}
 
 	/**
+	 * What a restore would actually overwrite -- a row count per table and
+	 * which options are included -- so the Recovery tab can show this before
+	 * an administrator confirms (GitHub issue #180's "preview the restore"
+	 * requirement). Returns null for a snapshot id that doesn't exist or
+	 * whose data has become corrupted, matching restore_snapshot()'s own
+	 * failure handling for those same cases.
+	 *
+	 * @return array{to_version:int, tables:array<string,int>, options:array<int,string>}|null
+	 */
+	public static function snapshot_contents( int $snapshot_id ): ?array {
+		global $wpdb;
+
+		$snapshot_table = $wpdb->prefix . 'sam_migration_snapshots';
+		if ( ! self::table_exists( $snapshot_table ) ) {
+			return null;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$row = $wpdb->get_row(
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$wpdb->prepare( "SELECT to_version, snapshot_data FROM {$snapshot_table} WHERE id = %d", $snapshot_id ),
+			ARRAY_A
+		);
+		if ( empty( $row ) ) {
+			return null;
+		}
+
+		$data = json_decode( (string) $row['snapshot_data'], true );
+		if ( ! is_array( $data ) ) {
+			return null;
+		}
+
+		$tables = array();
+		foreach ( self::SNAPSHOT_TABLE_SUFFIXES as $suffix ) {
+			if ( array_key_exists( $suffix, $data ) && is_array( $data[ $suffix ] ) ) {
+				$tables[ $suffix ] = count( $data[ $suffix ] );
+			}
+		}
+
+		$options = array();
+		foreach ( self::SNAPSHOT_OPTION_NAMES as $option_name ) {
+			if ( is_array( $data['options'] ?? null ) && array_key_exists( $option_name, $data['options'] ) ) {
+				$options[] = $option_name;
+			}
+		}
+
+		return array(
+			'to_version' => (int) $row['to_version'],
+			'tables'     => $tables,
+			'options'    => $options,
+		);
+	}
+
+	/**
 	 * Restores a snapshot's config-state tables, replacing every current
 	 * row in each SNAPSHOT_TABLE_SUFFIXES table with the snapshotted ones.
 	 * Refuses -- returning a reason rather than guessing -- when the
 	 * running code's schema no longer matches exactly what the snapshot
 	 * was taken for.
 	 *
-	 * @return array{ok:bool, reason?:string, tables_restored?:array<int,string>}
+	 * @return array{ok:bool, reason?:string, partial?:bool, tables_restored?:array<int,string>, tables_skipped?:array<int,string>, options_restored?:array<int,string>}
 	 */
 	public static function restore_snapshot( int $snapshot_id ): array {
 		global $wpdb;
@@ -296,13 +383,19 @@ class Rollback_Guard {
 		}
 
 		$restored = array();
+		$skipped  = array();
 		foreach ( self::SNAPSHOT_TABLE_SUFFIXES as $suffix ) {
 			if ( ! array_key_exists( $suffix, $data ) || ! is_array( $data[ $suffix ] ) ) {
-				continue;
+				continue; // Not in this snapshot's own data (an older snapshot, taken before this table existed) -- not a shortfall.
 			}
 
 			$table = $wpdb->prefix . $suffix;
 			if ( ! self::table_exists( $table ) ) {
+				// In the snapshot's data but missing from the live database --
+				// a genuine restore shortfall (unusual DB state), not merely an
+				// older snapshot. Tracked separately so the caller can report
+				// a partial restore instead of an unqualified success.
+				$skipped[] = $suffix;
 				continue;
 			}
 
@@ -319,16 +412,41 @@ class Rollback_Guard {
 			$restored[] = $suffix;
 		}
 
-		( new Audit_Log() )->log(
-			'rollback',
-			'snapshot_restored',
-			sprintf( 'Restored configuration snapshot #%1$d (schema v%2$d) covering: %3$s.', $snapshot_id, $snapshot_to_version, implode( ', ', $restored ) ),
-			'warning'
-		);
+		$options_restored = array();
+		if ( is_array( $data['options'] ?? null ) ) {
+			foreach ( self::SNAPSHOT_OPTION_NAMES as $option_name ) {
+				if ( ! array_key_exists( $option_name, $data['options'] ) ) {
+					continue; // Older snapshot, taken before this option name was tracked.
+				}
+
+				$value = $data['options'][ $option_name ];
+				if ( null === $value ) {
+					delete_option( $option_name ); // Wasn't set at snapshot time either.
+				} else {
+					update_option( $option_name, $value );
+				}
+				$options_restored[] = $option_name;
+			}
+		}
+
+		$summary_parts = $restored;
+		if ( ! empty( $options_restored ) ) {
+			$summary_parts[] = 'options: ' . implode( ', ', $options_restored );
+		}
+
+		$log_message = sprintf( 'Restored configuration snapshot #%1$d (schema v%2$d) covering: %3$s.', $snapshot_id, $snapshot_to_version, implode( ', ', $summary_parts ) );
+		if ( ! empty( $skipped ) ) {
+			$log_message .= sprintf( ' Skipped (present in the snapshot but missing from the live database): %s.', implode( ', ', $skipped ) );
+		}
+
+		( new Audit_Log() )->log( 'rollback', 'snapshot_restored', $log_message, 'warning' );
 
 		return array(
-			'ok'              => true,
-			'tables_restored' => $restored,
+			'ok'               => true,
+			'partial'          => ! empty( $skipped ),
+			'tables_restored'  => $restored,
+			'tables_skipped'   => $skipped,
+			'options_restored' => $options_restored,
 		);
 	}
 

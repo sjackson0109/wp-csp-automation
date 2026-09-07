@@ -989,9 +989,13 @@ class Admin_UI {
 
 		$result = Rollback_Guard::restore_snapshot( $snapshot_id );
 
+		if ( ! $result['ok'] ) {
+			$this->redirect_to_recovery_restore( 'failed', (string) ( $result['reason'] ?? '' ) );
+		}
+
 		$this->redirect_to_recovery_restore(
-			$result['ok'] ? 'success' : 'failed',
-			$result['ok'] ? '' : (string) ( $result['reason'] ?? '' )
+			! empty( $result['partial'] ) ? 'partial' : 'success',
+			! empty( $result['partial'] ) ? implode( ', ', $result['tables_skipped'] ?? array() ) : ''
 		);
 	}
 

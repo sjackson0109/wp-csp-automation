@@ -190,6 +190,155 @@ class RollbackGuardTest extends TestCase {
 		$result = Rollback_Guard::restore_snapshot( 1 );
 
 		$this->assertTrue( $result['ok'] );
+		$this->assertFalse( $result['partial'] );
 		$this->assertContains( 'csp_policy_profiles', $result['tables_restored'] );
+	}
+
+	// ── sam_exceptions in scope (GitHub issue #180) ─────────────────────────────
+
+	public function test_snapshot_table_suffixes_includes_exceptions(): void {
+		$this->assertContains( 'sam_exceptions', Rollback_Guard::SNAPSHOT_TABLE_SUFFIXES );
+	}
+
+	// ── Options snapshot/restore (GitHub issue #180) ────────────────────────────
+
+	public function test_snapshot_before_migration_captures_configured_options(): void {
+		update_option( 'wp_sam_automation_config', array( 'frontend' => 'manual' ) );
+
+		$snapshot_table = $GLOBALS['wpdb']->prefix . 'sam_migration_snapshots';
+		// One table_exists() check per SNAPSHOT_TABLE_SUFFIXES entry (all
+		// absent -- null), then one more for the snapshot table itself
+		// (present), matching the exact call order snapshot_before_
+		// migration() issues them in.
+		$GLOBALS['_wpdb_get_var_queue'] = array_merge(
+			array_fill( 0, count( Rollback_Guard::SNAPSHOT_TABLE_SUFFIXES ), null ),
+			array( $snapshot_table )
+		);
+
+		Rollback_Guard::snapshot_before_migration( 39, 40 );
+
+		$this->assertCount( 1, $GLOBALS['_wpdb_inserted_rows'] );
+		$decoded = json_decode( (string) $GLOBALS['_wpdb_inserted_rows'][0]['data']['snapshot_data'], true );
+		$this->assertSame( array( 'frontend' => 'manual' ), $decoded['options']['wp_sam_automation_config'] );
+	}
+
+	public function test_snapshot_before_migration_records_null_for_an_unset_option(): void {
+		$snapshot_table                 = $GLOBALS['wpdb']->prefix . 'sam_migration_snapshots';
+		$GLOBALS['_wpdb_get_var_queue']  = array_merge(
+			array_fill( 0, count( Rollback_Guard::SNAPSHOT_TABLE_SUFFIXES ), null ),
+			array( $snapshot_table )
+		);
+
+		Rollback_Guard::snapshot_before_migration( 39, 40 );
+
+		$decoded = json_decode( (string) $GLOBALS['_wpdb_inserted_rows'][0]['data']['snapshot_data'], true );
+		$this->assertArrayHasKey( 'wp_sam_automation_config', $decoded['options'] );
+		$this->assertNull( $decoded['options']['wp_sam_automation_config'] );
+	}
+
+	public function test_restore_snapshot_restores_a_configured_option(): void {
+		$snapshot_table                 = $GLOBALS['wpdb']->prefix . 'sam_migration_snapshots';
+		$GLOBALS['_wpdb_get_var_queue']  = array( $snapshot_table );
+		$GLOBALS['_wpdb_get_row']        = array(
+			'to_version'    => (int) WP_SAM_DB_VERSION,
+			'snapshot_data' => wp_json_encode(
+				array( 'options' => array( 'wp_sam_automation_config' => array( 'frontend' => 'automatic_high_approval' ) ) )
+			),
+		);
+
+		$result = Rollback_Guard::restore_snapshot( 1 );
+
+		$this->assertTrue( $result['ok'] );
+		$this->assertSame( array( 'wp_sam_automation_config' ), $result['options_restored'] );
+		$this->assertSame( array( 'frontend' => 'automatic_high_approval' ), get_option( 'wp_sam_automation_config' ) );
+	}
+
+	public function test_restore_snapshot_deletes_an_option_that_was_unset_at_snapshot_time(): void {
+		update_option( 'wp_sam_automation_config', array( 'frontend' => 'manual' ) );
+
+		$snapshot_table                 = $GLOBALS['wpdb']->prefix . 'sam_migration_snapshots';
+		$GLOBALS['_wpdb_get_var_queue']  = array( $snapshot_table );
+		$GLOBALS['_wpdb_get_row']        = array(
+			'to_version'    => (int) WP_SAM_DB_VERSION,
+			'snapshot_data' => wp_json_encode( array( 'options' => array( 'wp_sam_automation_config' => null ) ) ),
+		);
+
+		Rollback_Guard::restore_snapshot( 1 );
+
+		$this->assertFalse( get_option( 'wp_sam_automation_config', false ) );
+	}
+
+	public function test_restore_snapshot_leaves_options_untouched_when_older_snapshot_never_tracked_them(): void {
+		$snapshot_table                 = $GLOBALS['wpdb']->prefix . 'sam_migration_snapshots';
+		$GLOBALS['_wpdb_get_var_queue']  = array( $snapshot_table );
+		$GLOBALS['_wpdb_get_row']        = array(
+			'to_version'    => (int) WP_SAM_DB_VERSION,
+			'snapshot_data' => wp_json_encode( array() ), // No 'options' key at all.
+		);
+
+		$result = Rollback_Guard::restore_snapshot( 1 );
+
+		$this->assertTrue( $result['ok'] );
+		$this->assertSame( array(), $result['options_restored'] );
+	}
+
+	// ── Partial restore (GitHub issue #180) ─────────────────────────────────────
+
+	public function test_restore_snapshot_reports_partial_when_a_snapshotted_table_is_missing_live(): void {
+		$snapshot_table = $GLOBALS['wpdb']->prefix . 'sam_migration_snapshots';
+
+		// Snapshot table exists; csp_policy_profiles (the only table in this
+		// snapshot's data) does not -- an unusual live-DB state, not merely
+		// an older snapshot missing a newer table.
+		$GLOBALS['_wpdb_get_var_queue'] = array( $snapshot_table, null );
+		$GLOBALS['_wpdb_get_row']       = array(
+			'to_version'    => (int) WP_SAM_DB_VERSION,
+			'snapshot_data' => wp_json_encode(
+				array( 'csp_policy_profiles' => array( array( 'id' => 1 ) ) )
+			),
+		);
+
+		$result = Rollback_Guard::restore_snapshot( 1 );
+
+		$this->assertTrue( $result['ok'] );
+		$this->assertTrue( $result['partial'] );
+		$this->assertSame( array(), $result['tables_restored'] );
+		$this->assertSame( array( 'csp_policy_profiles' ), $result['tables_skipped'] );
+	}
+
+	// ── snapshot_contents() (GitHub issue #180's "preview the restore") ────────
+
+	public function test_snapshot_contents_returns_null_when_the_snapshot_table_does_not_exist(): void {
+		$GLOBALS['_wpdb_get_var'] = null;
+
+		$this->assertNull( Rollback_Guard::snapshot_contents( 1 ) );
+	}
+
+	public function test_snapshot_contents_returns_null_when_the_id_does_not_exist(): void {
+		$table                    = $GLOBALS['wpdb']->prefix . 'sam_migration_snapshots';
+		$GLOBALS['_wpdb_get_var'] = $table;
+		$GLOBALS['_wpdb_get_row'] = null;
+
+		$this->assertNull( Rollback_Guard::snapshot_contents( 999 ) );
+	}
+
+	public function test_snapshot_contents_returns_row_counts_and_option_names(): void {
+		$table                    = $GLOBALS['wpdb']->prefix . 'sam_migration_snapshots';
+		$GLOBALS['_wpdb_get_var'] = $table;
+		$GLOBALS['_wpdb_get_row'] = array(
+			'to_version'    => (int) WP_SAM_DB_VERSION,
+			'snapshot_data' => wp_json_encode(
+				array(
+					'csp_policy_profiles' => array( array( 'id' => 1 ), array( 'id' => 2 ) ),
+					'options'             => array( 'wp_sam_automation_config' => array() ),
+				)
+			),
+		);
+
+		$contents = Rollback_Guard::snapshot_contents( 1 );
+
+		$this->assertSame( (int) WP_SAM_DB_VERSION, $contents['to_version'] );
+		$this->assertSame( 2, $contents['tables']['csp_policy_profiles'] );
+		$this->assertSame( array( 'wp_sam_automation_config' ), $contents['options'] );
 	}
 }
