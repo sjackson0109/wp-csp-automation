@@ -43,6 +43,7 @@ use WP_SAM\Intelligence\Detectors\Tor_Exit_Detector;
 use WP_SAM\Intelligence\Event_Store;
 use WP_SAM\Intelligence\Change_Attribution_Recorder;
 use WP_SAM\Intelligence\Change_Log_Store;
+use WP_SAM\Intelligence\Exception_Scheduler;
 use WP_SAM\Intelligence\Geo_Ip_Store;
 use WP_SAM\Intelligence\Honeypath_Store;
 use WP_SAM\Intelligence\Identity_Resolver;
@@ -333,6 +334,10 @@ final class Plugin {
 
 		// WP Cron: daily policy rescan.
 		( new Scheduler( $this->audit ) )->register();
+
+		// WP Cron: daily exception expiry check + upcoming-expiry
+		// notification (GitHub issue #177).
+		( new Exception_Scheduler() )->register();
 
 		// ACME certificate automation: http-01 responder runs on every request
 		// (the CA's validation fetch is an anonymous front-end GET); the
