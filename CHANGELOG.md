@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows semantic versioning for plugin releases.
 
+## [2.9.81] - 2026-09-07
+
+### Fixed
+
+- `code-review-findings.json` retained 10 findings from an earlier review pass with no disposition metadata at all -- `status`/`issue`/`resolution` fields, no way to tell which had already been fixed by a later issue vs. genuinely still open (GitHub issue #164, closes it). Cross-referenced each against the current codebase: 8 were already resolved by issues #166/#167/#168/#169/#170 or the public package rename; the remaining 2 (both in `test/bootstrap.php`) are fixed directly in this release rather than merely re-documented:
+  - The PSR-4 autoloader is now registered immediately before the `WP_SAM\*` stub requires (`NonceBridge.php`, `Stub_Policy_Data_Loader.php`) instead of at the top of the file, closing the roughly 1,100-line window where a production class could be autoloaded ahead of its stub. It can't move any later than this: `Stub_Policy_Data_Loader.php` implements the real `WP_SAM\CSP\Policy_Data_Loader` interface, so the autoloader must already be active by the time that file loads.
+  - The autoloader's unresolvable-class branch now throws a `RuntimeException` instead of `trigger_error(..., E_USER_NOTICE)`, which PHPUnit does not fail a run on by default -- a genuinely unresolvable class now fails the specific test that touched it immediately instead of silently passing CI.
+  - `WebhookControllerTest.php`'s inline `WP_REST_Request`/`WP_REST_Response` stubs, made redundant once those classes were centralized into `bootstrap.php` for issue #168, are removed as a trivial cleanup.
+
 ## [2.9.80] - 2026-09-07
 
 ### Fixed
@@ -97,7 +106,7 @@ Part A of a 4-part remediation; loopback-scan concurrency/timeouts, scan diagnos
 
 ### Added
 
-- Edit action on Continuous Intelligence > Vendors, user-requested after noticing every built-in vendor row's Actions column showed nothing but a bare "—". `Scanner_Vendor_Store::upsert()` already fully supported updating an existing vendor (including a built-in row -- its own class docblock says so explicitly: "Built-in rows... can be edited... but not deleted") without disturbing `is_builtin`, but `page-intelligence.php` never exposed a way to reach that path -- only a hidden-for-built-ins Delete action existed. The "Add a vendor" form now doubles as an edit form when reached via a new per-row Edit link (`?tab=vendors&edit=<vendor_key>`), matching the same pre-fill-and-lock-the-key pattern Custom Rules already uses on Traffic Controls: all fields pre-filled from the existing row, the Key field locked (read-only, since `upsert()` matches on it -- changing it would silently create a new row instead of updating), and the submit button relabels to "Save changes" with a "Cancel" link back to the plain list.
+- Edit action on Continuous Intelligence > Vendors, user-requested after noticing every built-in vendor row's Actions column showed nothing but a bare "-". `Scanner_Vendor_Store::upsert()` already fully supported updating an existing vendor (including a built-in row -- its own class docblock says so explicitly: "Built-in rows... can be edited... but not deleted") without disturbing `is_builtin`, but `page-intelligence.php` never exposed a way to reach that path -- only a hidden-for-built-ins Delete action existed. The "Add a vendor" form now doubles as an edit form when reached via a new per-row Edit link (`?tab=vendors&edit=<vendor_key>`), matching the same pre-fill-and-lock-the-key pattern Custom Rules already uses on Traffic Controls: all fields pre-filled from the existing row, the Key field locked (read-only, since `upsert()` matches on it -- changing it would silently create a new row instead of updating), and the submit button relabels to "Save changes" with a "Cancel" link back to the plain list.
 - Confirmed live in Docker: editing a built-in vendor (Googlebot) through `upsert()` preserves `is_builtin = true` and updates its CIDR ranges/verification notes correctly; the shared Docker verification instance was restored to its original values afterward.
 - No schema change.
 
