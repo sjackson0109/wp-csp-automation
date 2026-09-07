@@ -1165,11 +1165,18 @@ spl_autoload_register( static function ( string $class ): void {
 	if ( is_readable( $file ) ) {
 		require_once $file;
 	} else {
-		// A notice-level trigger_error() doesn't fail a PHPUnit run by
-		// default, so an unresolvable class would silently pass CI right up
-		// until something first tried to instantiate it. Throwing here fails
-		// the specific test that touched this class immediately instead.
-		throw new \RuntimeException( "WP_SAM test autoloader: cannot resolve {$class}" );
+		// Deliberately silent, not a throw: several tests for commercial
+		// offline/ classes (e.g. EntitlementStoreTest, WebhookControllerTest)
+		// call class_exists( Some_Offline_Class::class ) in setUp() and
+		// markTestSkipped() when it's false -- the correct, intentional
+		// behaviour whenever offline/ isn't present, which is the normal
+		// case in public CI (see GitHub issue #164, code-review-findings.json,
+		// finding on this exact fallback -- throwing here was tried and
+		// confirmed to turn every one of those graceful skips into a hard
+		// CI failure instead). A genuinely-missing non-offline class still
+		// surfaces immediately as PHP's own native "Class not found" fatal
+		// the moment anything tries to instantiate it.
+		trigger_error( "WP_SAM test autoloader: cannot resolve {$class}", E_USER_NOTICE );
 	}
 } );
 

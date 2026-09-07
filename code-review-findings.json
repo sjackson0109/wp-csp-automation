@@ -76,9 +76,9 @@
     "line": 44,
     "summary": "Autoloader falls back to offline/ (gitignored) with no error when neither path resolves — CI green-lights code that would fatal at runtime if a class migrated to offline/.",
     "failure_scenario": "If a class is developed under offline/ and tested locally (where offline/ exists), the autoloader silently resolves it and tests pass. In CI (clean checkout, no offline/) the require is simply skipped; the fatal 'Class not found' only fires when that class is first instantiated, not at autoload time. A developer could ship a plugin with a missing class that looks fully tested, because CI runs against the same test suite without exercising the missing path.",
-    "status": "resolved_in_this_pr",
+    "status": "rejected",
     "issue": 164,
-    "resolution": "The autoloader's unresolvable-class branch now throws a RuntimeException instead of trigger_error(..., E_USER_NOTICE) (which PHPUnit doesn't fail on by default) -- a genuinely unresolvable class now fails the specific test that touched it immediately."
+    "resolution": "Tried making the autoloader throw instead of trigger_error(..., E_USER_NOTICE) -- confirmed in CI this breaks an intentional, load-bearing pattern: EntitlementStoreTest and WebhookControllerTest call class_exists( Entitlement_Store::class ) in setUp() and markTestSkipped() when it's false, which is the correct behaviour whenever the commercial offline/ module isn't present (the normal case in public CI). Throwing from inside the autoloader turns that graceful skip into a hard error for every offline-module test, since class_exists() can no longer return false -- it propagates the exception instead. Reverted; the silent notice is not a bug for this specific, deliberate offline/-module split, and a genuinely-missing non-offline class still surfaces immediately as PHP's own native 'Class not found' fatal the moment anything tries to instantiate it."
   },
   {
     "file": "test/unit/NonceBridge.php",
