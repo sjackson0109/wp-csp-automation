@@ -37,9 +37,49 @@ class EvidenceExporterTest extends TestCase {
 	public function test_build_includes_every_top_level_section(): void {
 		$bundle = $this->exporter->build();
 
-		foreach ( array( 'format_version', 'exported_at', 'site_url', 'plugin_version', 'disclaimer', 'framework_context', 'health_summary', 'controls', 'exceptions', 'certificates', 'baseline', 'drift_open_count', 'recent_change_log', 'audit_log_excerpt' ) as $key ) {
+		foreach ( array( 'format_version', 'exported_at', 'reporting_period', 'site_url', 'plugin_version', 'disclaimer', 'framework_context', 'health_summary', 'controls', 'exceptions', 'certificates', 'baseline', 'drift_open_count', 'recent_change_log', 'audit_log_excerpt', 'checksum' ) as $key ) {
 			$this->assertArrayHasKey( $key, $bundle );
 		}
+	}
+
+	// ── Reporting period + checksum (GitHub issue #178) ─────────────────────────
+
+	public function test_build_without_a_period_reports_null_bounds(): void {
+		$bundle = $this->exporter->build();
+
+		$this->assertNull( $bundle['reporting_period']['from'] );
+		$this->assertNull( $bundle['reporting_period']['to'] );
+	}
+
+	public function test_build_echoes_back_a_supplied_period(): void {
+		$bundle = $this->exporter->build(
+			array(
+				'from' => '2026-01-01',
+				'to'   => '2026-01-31',
+			)
+		);
+
+		$this->assertSame( '2026-01-01', $bundle['reporting_period']['from'] );
+		$this->assertSame( '2026-01-31', $bundle['reporting_period']['to'] );
+	}
+
+	public function test_build_includes_a_verifiable_sha256_checksum(): void {
+		$bundle = $this->exporter->build();
+
+		$this->assertMatchesRegularExpression( '/^[a-f0-9]{64}$/', $bundle['checksum'] );
+
+		$without_checksum = $bundle;
+		unset( $without_checksum['checksum'] );
+		$this->assertSame( hash( 'sha256', (string) wp_json_encode( $without_checksum ) ), $bundle['checksum'] );
+	}
+
+	public function test_build_framework_context_covers_all_five_named_frameworks(): void {
+		$bundle = $this->exporter->build();
+
+		$this->assertSame(
+			array( 'Cyber Essentials', 'ISO/IEC 27001', 'PCI DSS', 'OWASP ASVS', 'CIS Controls' ),
+			$bundle['framework_context']
+		);
 	}
 
 	public function test_build_disclaims_certification(): void {
@@ -93,12 +133,43 @@ class EvidenceExporterTest extends TestCase {
 
 	// ── exceptions_detail() ──────────────────────────────────────────────────
 
-	public function test_exceptions_detail_has_the_four_expected_buckets(): void {
+	public function test_exceptions_detail_has_the_five_expected_buckets(): void {
 		$detail = $this->invoke( 'exceptions_detail' );
 
 		$this->assertArrayHasKey( 'ip_allow_rules', $detail );
 		$this->assertArrayHasKey( 'permanent_blocks', $detail );
 		$this->assertArrayHasKey( 'dependency_exceptions', $detail );
 		$this->assertArrayHasKey( 'csp_overrides', $detail );
+		$this->assertArrayHasKey( 'formal_exceptions', $detail );
+	}
+
+	/**
+	 * exceptions_detail() issues 5 get_results() calls in a fixed order:
+	 * ip_allow, permanent_blocks, dependency_exceptions, csp_overrides,
+	 * formal_exceptions (GitHub issue #178's new sam_exceptions read, real
+	 * since #177) -- queued precisely to prove the last one lands in the
+	 * right bucket, rather than relying on the shared un-queued default
+	 * every other test in this file uses.
+	 */
+	public function test_exceptions_detail_formal_exceptions_reads_the_exceptions_table(): void {
+		$exception_row = array(
+			'control'                => 'csp_enforce',
+			'surface'                => 'frontend',
+			'business_justification' => 'Legacy embed cannot be updated before Q3.',
+			'owner'                  => 'jane@example.test',
+			'risk_classification'    => 'medium',
+			'expiry_date'            => '2030-01-01 00:00:00',
+		);
+		$GLOBALS['_wpdb_get_results_queue'] = array(
+			array(), // ip_allow_rules
+			array(), // permanent_blocks
+			array(), // dependency_exceptions
+			array(), // csp_overrides
+			array( $exception_row ), // formal_exceptions
+		);
+
+		$detail = $this->invoke( 'exceptions_detail' );
+
+		$this->assertSame( array( $exception_row ), $detail['formal_exceptions'] );
 	}
 }

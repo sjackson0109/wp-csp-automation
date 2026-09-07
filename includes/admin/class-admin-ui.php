@@ -2221,7 +2221,11 @@ class Admin_UI {
 			wp_die( esc_html__( 'You do not have permission to export evidence.', 'vcns-security-automation-manager' ) );
 		}
 
-		$bundle = ( new \WP_SAM\Intelligence\Evidence_Exporter() )->build();
+		$period = array(
+			'from' => sanitize_text_field( wp_unslash( $_POST['period_from'] ?? '' ) ),
+			'to'   => sanitize_text_field( wp_unslash( $_POST['period_to'] ?? '' ) ),
+		);
+		$bundle = ( new \WP_SAM\Intelligence\Evidence_Exporter() )->build( $period );
 		$json   = wp_json_encode( $bundle, JSON_PRETTY_PRINT );
 
 		$this->plugin->audit->log( 'assurance', 'evidence_exported', 'An administrator downloaded an evidence export.', 'info' );

@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows semantic versioning for plugin releases.
 
+## [2.9.86] - 2026-09-08
+
+### Added
+
+- Compliance evidence pack (GitHub issue #178): `Evidence_Exporter::build()` gains a `checksum` field (SHA-256 over the canonicalized payload minus the checksum itself -- verify by removing the field, re-encoding with `wp_json_encode()`, and re-hashing), an optional `$period` parameter (`from`/`to`, reusing `Table_Query::date_range_where()`'s accepted formats) that bounds the `audit_log_excerpt` section -- the only section that's genuinely history-shaped rather than current-configuration state -- and a new `formal_exceptions` bucket under `exceptions`, reading the real `sam_exceptions` table from #177 alongside the existing proxy signals (IP allow rules, permanent blocks, dependency exceptions, CSP overrides). The Evidence Export form on Settings/Overview gained optional "Reporting period" date inputs. Framework mappings (Cyber Essentials, ISO/IEC 27001, PCI DSS, OWASP ASVS, CIS Controls) were already complete -- confirmed, no work needed there. CSV/HTML export formats remain out of scope for this pass (no `fputcsv`/HTML-report precedent exists anywhere in the codebase to build on).
+
 ## [2.9.85] - 2026-09-07
 
 ### Added
