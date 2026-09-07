@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows semantic versioning for plugin releases.
 
+## [2.9.84] - 2026-09-07
+
+### Added
+
+- Promotion gates (GitHub issue #179): `Admin_UI::gate_allows_enforce()` grows from 2 real gates + 1 dead gate to 5 real gates. Gate 3 (previously reading the never-written `csp_policy_profiles.override_expires_at`/`override_owner` columns) is rewired to `Exception_Store::has_active_for('csp_enforce', $surface)`, now that #177 makes exceptions real. Two new gates: no source candidates still `pending` approval for the surface, and no competing CSP header recorded within the last 48 hours (new `Conflict_Detector::has_recent_conflicts()`, reusing the exact signal/window the dashboard's own conflict-notices banner already uses). `ajax_toggle_mode()` now also requires a non-empty `reason` when promoting to `enforce`, logged via `Audit_Log` (`promotion_gate`/`enforce_promoted`) -- the admin.js click handler prompts for one via the existing `requiredReason()` helper before the request is sent. External verification (roadmap §10.3) stays explicitly out of scope, documented in the gate's own code as blocked on #182 (unbuilt).
+
 ## [2.9.83] - 2026-09-07
 
 ### Added

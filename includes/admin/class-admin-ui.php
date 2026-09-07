@@ -64,6 +64,7 @@ use WP_SAM\Plugin;
 use WP_SAM\Rollback_Guard;
 use WP_SAM\CSP\Automation_Config;
 use WP_SAM\CSP\Automation_Mode_Registry;
+use WP_SAM\CSP\Conflict_Detector;
 use WP_SAM\CSP\Policy_Builder;
 use WP_SAM\CSP\Policy_Change_Manager;
 use WP_SAM\CSP\Policy_Version_Manager;
@@ -721,11 +722,12 @@ class Admin_UI {
 					'nonce'     => wp_create_nonce( 'wp_sam_admin_nonce' ),
 					'restNonce' => wp_create_nonce( 'wp_rest' ),
 					'i18n'      => array(
-						'scanning'        => __( 'Scanning…', 'vcns-security-automation-manager' ),
-						'scanDone'        => __( 'Scan complete.', 'vcns-security-automation-manager' ),
-						'scanError'       => __( 'Scan failed. Check error log.', 'vcns-security-automation-manager' ),
-						'reasonRequired'  => __( 'A decision reason is required.', 'vcns-security-automation-manager' ),
-						'upgradeStarting' => __( 'Starting checkout…', 'vcns-security-automation-manager' ),
+						'scanning'            => __( 'Scanning…', 'vcns-security-automation-manager' ),
+						'scanDone'            => __( 'Scan complete.', 'vcns-security-automation-manager' ),
+						'scanError'           => __( 'Scan failed. Check error log.', 'vcns-security-automation-manager' ),
+						'reasonRequired'      => __( 'A decision reason is required.', 'vcns-security-automation-manager' ),
+						'enforceReasonPrompt' => __( 'Reason for promoting this surface to enforce mode:', 'vcns-security-automation-manager' ),
+						'upgradeStarting'     => __( 'Starting checkout…', 'vcns-security-automation-manager' ),
 					),
 				)
 			);
@@ -2526,8 +2528,16 @@ class Admin_UI {
 			wp_send_json_error( array( 'message' => 'Invalid mode.' ) );
 		}
 
-		// Full promotion gate: enforce requires passing all configured checks.
+		// Full promotion gate: enforce requires passing all configured checks
+		// plus a recorded reason -- "recorded administrator reason" is one of
+		// the roadmap's own listed promotion gates (GitHub issue #179).
+		$reason = '';
 		if ( 'enforce' === $mode ) {
+			$reason = sanitize_textarea_field( wp_unslash( $_POST['reason'] ?? '' ) );
+			if ( '' === $reason ) {
+				wp_send_json_error( array( 'message' => __( 'A reason is required to promote a surface to enforce mode.', 'vcns-security-automation-manager' ) ) );
+			}
+
 			$gate_result = $this->gate_allows_enforce( $surface );
 			if ( true !== $gate_result ) {
 				wp_send_json_error( array( 'message' => $gate_result ) );
@@ -2545,6 +2555,11 @@ class Admin_UI {
 			array( '%s', '%s' ),
 			array( '%s' )
 		);
+
+		if ( 'enforce' === $mode ) {
+			$this->plugin->audit->log( 'promotion_gate', 'enforce_promoted', "Surface '{$surface}' promoted to enforce mode: {$reason}", 'info' );
+		}
+
 		wp_send_json_success();
 	}
 
@@ -3165,32 +3180,46 @@ class Admin_UI {
 			);
 		}
 
-		// ── Gate 3: no active unresolved temporary override ───────────────────
+		// ── Gate 3: no active exception overriding this control/surface ───────
+		// Rewired to Exception_Store (GitHub issue #177) -- the previous
+		// version read csp_policy_profiles.override_expires_at/override_owner,
+		// which nothing has ever written (confirmed dead code); this is now
+		// backed by a real, admin-created exception.
+		if ( ( new Exception_Store( $this->plugin->audit ) )->has_active_for( 'csp_enforce', $surface ) ) {
+			return __( 'Cannot promote to enforce: an active exception exists for this surface. Resolve or revoke it on the Exceptions tab before enabling enforce mode.', 'vcns-security-automation-manager' );
+		}
+
+		// ── Gate 4: no unapproved candidate sources awaiting a decision ───────
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		$profile = $wpdb->get_row(
+		$pending_count = (int) $wpdb->get_var(
 			$wpdb->prepare(
-				"SELECT override_expires_at, override_owner FROM {$wpdb->prefix}csp_policy_profiles WHERE surface = %s LIMIT 1",
+				"SELECT COUNT(*) FROM {$wpdb->prefix}csp_source_inventory WHERE surface = %s AND approval_state = 'pending'",
 				$surface
-			),
-			ARRAY_A
+			)
 		);
 
-		if ( $profile ) {
-			$expires_at = $profile['override_expires_at'] ?? null;
-			$owner      = $profile['override_owner'] ?? null;
-
-			if ( ! empty( $expires_at ) && ! empty( $owner ) ) {
-				$expires_ts = strtotime( $expires_at );
-				if ( false !== $expires_ts && $expires_ts > time() ) {
-					return sprintf(
-						/* translators: 1: override owner, 2: expiry datetime */
-						__( 'Cannot promote to enforce: a temporary override set by "%1$s" is active until %2$s. Wait for it to expire or remove it before enabling enforce mode.', 'vcns-security-automation-manager' ),
-						esc_html( $owner ),
-						esc_html( $expires_at )
-					);
-				}
-			}
+		if ( $pending_count > 0 ) {
+			return sprintf(
+				/* translators: %d: number of sources awaiting a decision */
+				_n(
+					'Cannot promote to enforce: %d source candidate for this surface is still awaiting a decision. Approve or reject it on the For Review tab first.',
+					'Cannot promote to enforce: %d source candidates for this surface are still awaiting a decision. Approve or reject them on the For Review tab first.',
+					$pending_count,
+					'vcns-security-automation-manager'
+				),
+				$pending_count
+			);
 		}
+
+		// ── Gate 5: no competing CSP header detected recently ─────────────────
+		// Site-wide, not surface-scoped -- see Conflict_Detector::
+		// has_recent_conflicts()'s own docblock for why.
+		if ( ( new Conflict_Detector( $this->plugin->audit ) )->has_recent_conflicts() ) {
+			return __( 'Cannot promote to enforce: a competing Content-Security-Policy header was detected recently. Review the conflict banner on the CSP dashboard before enabling enforcement.', 'vcns-security-automation-manager' );
+		}
+
+		// External verification (roadmap §10.3) is not a gate here -- no
+		// external verification service exists yet (GitHub issue #182).
 
 		return true;
 	}
