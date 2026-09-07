@@ -332,6 +332,7 @@ class Activator {
 			'sam_detector_policies',
 			'sam_custom_detector_rules',
 			'sam_network_rules',
+			'sam_exceptions',
 		);
 	}
 
@@ -1327,6 +1328,44 @@ class Activator {
   created_at datetime NOT NULL,
   PRIMARY KEY  (id),
   KEY rule_type (rule_type)
+) {$cc};"
+		);
+
+		// Schema v40: sam_exceptions -- a controlled, time-bound weakening of a
+		// control/surface (GitHub issue #177), the storage half of
+		// Exception_Store. expiry_date is nullable only for a privileged
+		// override (is_privileged_override=1); every ordinary exception
+		// requires one. review_status distinguishes an exception still in
+		// force ('active') from one that has run out ('expired', flipped
+		// automatically by Exception_Scheduler's daily cron) or been
+		// deliberately withdrawn early ('revoked', via revoked_at/
+		// revoked_by). Full history (creation, expiry-date extensions,
+		// revocations) is preserved in sam_audit_log rather than a second
+		// ledger table here -- this table only ever holds current state.
+		dbDelta(
+			"CREATE TABLE {$p}sam_exceptions (
+  id bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+  control varchar(64) NOT NULL,
+  surface varchar(32) NOT NULL DEFAULT '',
+  weaker_value text NOT NULL,
+  business_justification text NOT NULL,
+  technical_justification text NULL,
+  owner varchar(255) NOT NULL,
+  approver varchar(255) NOT NULL DEFAULT '',
+  compensating_control text NULL,
+  risk_classification varchar(16) NOT NULL DEFAULT 'medium',
+  reference varchar(255) NOT NULL DEFAULT '',
+  is_privileged_override tinyint(1) NOT NULL DEFAULT 0,
+  review_status varchar(16) NOT NULL DEFAULT 'active',
+  start_date datetime NOT NULL,
+  expiry_date datetime NULL,
+  revoked_at datetime NULL,
+  revoked_by varchar(255) NULL,
+  created_at datetime NOT NULL,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY  (id),
+  KEY review_status (review_status),
+  KEY control_surface (control, surface)
 ) {$cc};"
 		);
 

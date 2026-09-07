@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows semantic versioning for plugin releases.
 
+## [2.9.83] - 2026-09-07
+
+### Added
+
+- Time-bound exceptions (GitHub issue #177): a new `sam_exceptions` table (schema v40) and `Intelligence\Exception_Store` record a controlled, auditable weakening of a control/surface -- required fields are `control`, `weaker_value`, `business_justification`, and `owner`; `expiry_date` is required unless `is_privileged_override` is set. New "Exceptions" tab on Settings/Overview (create, extend with a required reason, revoke immediately with a required reason), modeled on `Custom_Rule_Store`'s CRUD pattern. No hard delete -- an exception is always either `active`, `expired` (flipped automatically), or `revoked`; every creation, extension, and revocation is written to `sam_audit_log` rather than a second history table. `Intelligence\Exception_Scheduler` runs a new daily cron (`wp_sam_exception_check`) that expires overdue exceptions and emails the configured admin address (`wp_sam_notify_email`, falling back to `admin_email`) about exceptions expiring within 7 days. The Decide page gets a new "Active Exceptions" summary row. Added `is_email()`/`wp_mail()` stubs to the test bootstrap to support this.
+
 ## [2.9.82] - 2026-09-07
 
 ### Fixed

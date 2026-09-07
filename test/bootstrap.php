@@ -628,6 +628,23 @@ if ( ! function_exists( 'plugin_basename' ) ) {
 	}
 }
 
+if ( ! function_exists( 'is_email' ) ) {
+	function is_email( string $email ): string|false {
+		return false !== filter_var( $email, FILTER_VALIDATE_EMAIL ) ? $email : false;
+	}
+}
+
+if ( ! function_exists( 'wp_mail' ) ) {
+	function wp_mail( string $to, string $subject, string $message ): bool {
+		$GLOBALS['_wp_mail_calls'][] = array(
+			'to'      => $to,
+			'subject' => $subject,
+			'message' => $message,
+		);
+		return true;
+	}
+}
+
 if ( ! function_exists( 'get_bloginfo' ) ) {
 	function get_bloginfo( string $show = '' ): string {
 		if ( 'version' === $show ) {
@@ -1099,6 +1116,7 @@ function wp_test_reset_globals(): void {
 	$GLOBALS['_wp_remote_all_requests']  = [];
 	$GLOBALS['_wp_spawn_cron_calls']     = 0;
 	$GLOBALS['_wp_status_header_calls']  = [];
+	$GLOBALS['_wp_mail_calls']           = [];
 	$GLOBALS['_wp_is_admin']             = false;
 	$GLOBALS['_wp_is_ssl']               = false;
 	$GLOBALS['_wp_doing_cron']           = false;

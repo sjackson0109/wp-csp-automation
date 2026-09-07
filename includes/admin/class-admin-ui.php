@@ -84,6 +84,7 @@ use WP_SAM\Intelligence\Detector_Registry;
 use WP_SAM\Intelligence\Drift_Scanner;
 use WP_SAM\Intelligence\Drift_Store;
 use WP_SAM\Intelligence\Event_Store;
+use WP_SAM\Intelligence\Exception_Store;
 use WP_SAM\Intelligence\Geo_Ip_Store;
 use WP_SAM\Intelligence\Honeypath_Store;
 use WP_SAM\Intelligence\Humans_Txt_Store;
@@ -175,6 +176,9 @@ class Admin_UI {
 		add_action( 'admin_post_wp_sam_custom_rule_save', array( $this, 'handle_custom_rule_save' ) );
 		add_action( 'admin_post_wp_sam_custom_rule_delete', array( $this, 'handle_custom_rule_delete' ) );
 		add_action( 'wp_ajax_wp_sam_test_custom_rule', array( $this, 'ajax_test_custom_rule' ) );
+		add_action( 'admin_post_wp_sam_exception_create', array( $this, 'handle_exception_create' ) );
+		add_action( 'admin_post_wp_sam_exception_extend', array( $this, 'handle_exception_extend' ) );
+		add_action( 'admin_post_wp_sam_exception_revoke', array( $this, 'handle_exception_revoke' ) );
 		add_action( 'admin_post_wp_sam_baseline_capture', array( $this, 'handle_baseline_capture' ) );
 		add_action( 'admin_post_wp_sam_drift_scan', array( $this, 'handle_drift_scan' ) );
 		add_action( 'admin_post_wp_sam_drift_disposition', array( $this, 'handle_drift_disposition' ) );
@@ -1345,6 +1349,79 @@ class Admin_UI {
 		$matched = ( new Custom_Rule_Store() )->test( $pattern, $sample );
 
 		wp_send_json_success( array( 'matched' => $matched ) );
+	}
+
+	// ── Time-bound exceptions (GitHub issue #177) ─────────────────────────────
+
+	public function handle_exception_create(): void {
+		check_admin_referer( 'wp_sam_exception_create' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have permission to manage exceptions.', 'vcns-security-automation-manager' ) );
+		}
+
+		$input = array(
+			'control'                 => wp_unslash( $_POST['control'] ?? '' ),
+			'surface'                 => wp_unslash( $_POST['surface'] ?? '' ),
+			'weaker_value'            => wp_unslash( $_POST['weaker_value'] ?? '' ),
+			'business_justification'  => wp_unslash( $_POST['business_justification'] ?? '' ),
+			'technical_justification' => wp_unslash( $_POST['technical_justification'] ?? '' ),
+			'owner'                   => wp_unslash( $_POST['owner'] ?? '' ),
+			'approver'                => wp_unslash( $_POST['approver'] ?? '' ),
+			'compensating_control'    => wp_unslash( $_POST['compensating_control'] ?? '' ),
+			'risk_classification'     => wp_unslash( $_POST['risk_classification'] ?? '' ),
+			'reference'               => wp_unslash( $_POST['reference'] ?? '' ),
+			'is_privileged_override'  => ! empty( $_POST['is_privileged_override'] ),
+			'expiry_date'             => wp_unslash( $_POST['expiry_date'] ?? '' ),
+		);
+
+		$result = ( new Exception_Store() )->create( $input );
+
+		$redirect = admin_url( 'admin.php?page=security-automation-manager&tab=exceptions' );
+		if ( ! $result['success'] ) {
+			set_transient( 'wp_sam_exception_errors_' . get_current_user_id(), $result['errors'], MINUTE_IN_SECONDS );
+			set_transient( 'wp_sam_exception_input_' . get_current_user_id(), $input, MINUTE_IN_SECONDS );
+		}
+		wp_safe_redirect( $redirect );
+		exit;
+	}
+
+	public function handle_exception_extend(): void {
+		check_admin_referer( 'wp_sam_exception_extend' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have permission to manage exceptions.', 'vcns-security-automation-manager' ) );
+		}
+
+		$id              = (int) ( $_POST['exception_id'] ?? 0 );
+		$new_expiry_date = (string) wp_unslash( $_POST['new_expiry_date'] ?? '' );
+		$reason          = (string) wp_unslash( $_POST['reason'] ?? '' );
+
+		$result = ( new Exception_Store() )->extend( $id, $new_expiry_date, $reason );
+
+		if ( ! $result['success'] ) {
+			set_transient( 'wp_sam_exception_errors_' . get_current_user_id(), $result['errors'], MINUTE_IN_SECONDS );
+		}
+		wp_safe_redirect( admin_url( 'admin.php?page=security-automation-manager&tab=exceptions' ) );
+		exit;
+	}
+
+	public function handle_exception_revoke(): void {
+		check_admin_referer( 'wp_sam_exception_revoke' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have permission to manage exceptions.', 'vcns-security-automation-manager' ) );
+		}
+
+		$id       = (int) ( $_POST['exception_id'] ?? 0 );
+		$reason   = (string) wp_unslash( $_POST['reason'] ?? '' );
+		$user     = get_userdata( get_current_user_id() );
+		$username = $user ? $user->user_login : '';
+
+		$result = ( new Exception_Store() )->revoke( $id, $reason, $username );
+
+		if ( ! $result['success'] ) {
+			set_transient( 'wp_sam_exception_errors_' . get_current_user_id(), $result['errors'], MINUTE_IN_SECONDS );
+		}
+		wp_safe_redirect( admin_url( 'admin.php?page=security-automation-manager&tab=exceptions' ) );
+		exit;
 	}
 
 	// ── Baseline and Drift (Phase 3F) ─────────────────────────────────────────

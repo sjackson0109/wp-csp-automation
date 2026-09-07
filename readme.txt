@@ -4,7 +4,7 @@ Tags: security, csp, content security policy, hsts, ssl certificates
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 2.9.82
+Stable tag: 2.9.83
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -115,6 +115,10 @@ When an administrator configures automatic cPanel deployment, once a certificate
 
 == Changelog ==
 
+= 2.9.83 =
+
+* Added: Exceptions (Settings/Overview > Exceptions, GitHub issue #177) -- record a controlled, time-bound weakening of a control or surface (a legacy integration, a third-party embed) as an auditable exception instead of a silent override. Requires a business justification and an owner; requires an expiry date unless a privileged override is used. A daily check automatically returns an exception to review once it expires, and emails the configured admin address as one approaches expiry. Every creation, extension, and revocation is written to the audit log.
+
 = 2.9.82 =
 
 * Fixed: three release-verification test gaps closed (GitHub issue #159) -- a dedicated test now covers the update checker's HTTPS-only package URL rule (previously only exercised indirectly by a path-traversal test), a missing or expired manifest cache entry correctly falls through to a fresh check instead of being treated as a result, and a cached manifest is honoured without an unnecessary re-fetch.
@@ -181,9 +185,5 @@ When an administrator configures automatic cPanel deployment, once a certificate
 = 2.9.68 =
 
 * Fixed: the "Settings" link on the Plugins list page pointed at the Content Security Policy dashboard's own Settings tab instead of the plugin's actual landing page. It now goes to Settings/Overview, matching the top-level admin menu's own first entry (also labelled "Settings").
-
-= 2.9.67 =
-
-* Added: plain-language explainer text on the Settings/Overview page (Overview, Readiness, and Security Health tabs) -- each of the five status layers, and the readiness and health checks below them, now has a short paragraph explaining what it covers, why it matters, and what a Fail or Warning actually means in practice. First installment of a wider documentation pass across the admin UI aimed at making the plugin approachable to administrators without a security background, not just to people who already know what CSP, MIME-sniffing, or clickjacking mean.
 
 Full changelog history: https://github.com/vcns/security-automation-manager/blob/main/CHANGELOG.md

@@ -172,6 +172,7 @@ class SchemaMigrationTest extends TestCase {
 			'wp_sam_detector_policies',
 			'wp_sam_custom_detector_rules',
 			'wp_sam_network_rules',
+			'wp_sam_exceptions',
 		);
 
 		$this->assertSame(
