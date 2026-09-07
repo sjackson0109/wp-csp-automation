@@ -18,6 +18,8 @@ declare( strict_types=1 );
 
 namespace WP_SAM\Intelligence;
 
+use WP_SAM\Admin\Table_Query;
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
@@ -26,11 +28,28 @@ final class Evidence_Exporter {
 
 	private const AUDIT_LOG_EXCERPT_LIMIT = 50;
 
-	/** @return array<string, mixed> JSON-serialisable evidence bundle. */
-	public function build(): array {
-		return array(
+	/**
+	 * @param array{from?:string,to?:string} $period Optional reporting-period
+	 *        bounds (GitHub issue #178), reusing Table_Query::date_range_where()'s
+	 *        accepted formats (`Y-m-d` or `Y-m-d\TH:i`). Only the audit-log
+	 *        excerpt is actually date-scoped by this -- every other section
+	 *        is current-configuration state, which has no meaningful "period"
+	 *        to narrow (a policy profile doesn't have a history of values,
+	 *        only a current one). Omitted or both-empty means the full,
+	 *        unscoped export this method has always produced.
+	 * @return array<string, mixed> JSON-serialisable evidence bundle.
+	 */
+	public function build( array $period = array() ): array {
+		$from = (string) ( $period['from'] ?? '' );
+		$to   = (string) ( $period['to'] ?? '' );
+
+		$payload = array(
 			'format_version'    => 1,
 			'exported_at'       => current_time( 'mysql', true ),
+			'reporting_period'  => array(
+				'from' => '' !== $from ? $from : null,
+				'to'   => '' !== $to ? $to : null,
+			),
 			'site_url'          => get_bloginfo( 'url' ),
 			'plugin_version'    => defined( 'WP_SAM_VERSION' ) ? WP_SAM_VERSION : '',
 			'disclaimer'        => __( 'This export documents technical security controls as locally configured by this plugin. It is evidence to support a review, not a certification, attestation, or compliance determination of any kind. A named framework below is informational context only.', 'vcns-security-automation-manager' ),
@@ -46,8 +65,22 @@ final class Evidence_Exporter {
 			'baseline'          => $this->baseline_detail(),
 			'drift_open_count'  => count( ( new Drift_Store() )->all( 'unexplained' ) ),
 			'recent_change_log' => ( new Change_Log_Store() )->all( 20 ),
-			'audit_log_excerpt' => $this->audit_log_excerpt(),
+			'audit_log_excerpt' => $this->audit_log_excerpt( $from, $to ),
 		);
+
+		// Checksummed, not cryptographically signed (GitHub issue #178's
+		// literal "signed or checksummed" ask) -- this lets the plugin
+		// itself detect later tampering if the export is ever re-imported
+		// or re-verified, which is what matters here. There's no
+		// third-party public key to verify against the way the GitHub
+		// updater's package checksums or the remote-config Ed25519
+		// signature have -- an evidence pack a customer hands to their own
+		// auditor has no equivalent trust anchor to design around. To
+		// verify: remove this field, re-encode with wp_json_encode() at
+		// default flags, and compare a fresh sha256 of that string.
+		$payload['checksum'] = hash( 'sha256', (string) wp_json_encode( $payload ) );
+
+		return $payload;
 	}
 
 	/** @return array<int, array<string, mixed>> */
@@ -112,11 +145,26 @@ final class Evidence_Exporter {
 			ARRAY_A
 		);
 
+		// GitHub issue #177's real, formal exceptions table -- listed
+		// alongside, not instead of, the proxy signals above. Those remain
+		// genuinely different things: an IP allow rule isn't the same
+		// statement as a declared, time-bound, justified exception.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$formal_exceptions = $wpdb->get_results(
+			$wpdb->prepare(
+				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				"SELECT control, surface, business_justification, owner, risk_classification, expiry_date FROM {$wpdb->prefix}sam_exceptions WHERE review_status = %s",
+				'active'
+			),
+			ARRAY_A
+		);
+
 		return array(
 			'ip_allow_rules'        => ! empty( $ip_allow ) ? $ip_allow : array(),
 			'permanent_blocks'      => ! empty( $persistent_blocks ) ? $persistent_blocks : array(),
 			'dependency_exceptions' => ! empty( $dep_exceptions ) ? $dep_exceptions : array(),
 			'csp_overrides'         => ! empty( $csp_overrides ) ? $csp_overrides : array(),
+			'formal_exceptions'     => ! empty( $formal_exceptions ) ? $formal_exceptions : array(),
 		);
 	}
 
@@ -149,16 +197,35 @@ final class Evidence_Exporter {
 		);
 	}
 
-	/** @return array<int, array<string, mixed>> Most recent warning/error audit-log entries. */
-	private function audit_log_excerpt(): array {
+	/**
+	 * Most recent warning/error audit-log entries, optionally bounded to a
+	 * reporting period -- the one section of this export that genuinely has
+	 * a "period" to narrow (see build()'s own docblock).
+	 *
+	 * @return array<int, array<string, mixed>>
+	 */
+	private function audit_log_excerpt( string $from = '', string $to = '' ): array {
 		global $wpdb;
 		$table = $wpdb->prefix . 'sam_audit_log';
+
+		$where = array( "severity IN ('warning','error')" );
+		$args  = array();
+
+		$range = Table_Query::date_range_where( 'created_at', $from, $to );
+		if ( null !== $range ) {
+			$where[] = $range['sql'];
+			array_push( $args, ...$range['args'] );
+		}
+
+		$args[]    = self::AUDIT_LOG_EXCERPT_LIMIT;
+		$where_sql = implode( ' AND ', $where );
+
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
 				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-				"SELECT component, event, detail, severity, created_at FROM {$table} WHERE severity IN ('warning','error') ORDER BY created_at DESC LIMIT %d",
-				self::AUDIT_LOG_EXCERPT_LIMIT
+				"SELECT component, event, detail, severity, created_at FROM {$table} WHERE {$where_sql} ORDER BY created_at DESC LIMIT %d",
+				...$args
 			),
 			ARRAY_A
 		);

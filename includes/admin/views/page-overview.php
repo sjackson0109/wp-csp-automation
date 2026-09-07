@@ -539,11 +539,18 @@ $status_badge       = static function ( string $status ): void {
 
 	<h2 style="margin-top:2em"><?php esc_html_e( 'Evidence Export', 'vcns-security-automation-manager' ); ?></h2>
 	<p class="description">
-		<?php esc_html_e( 'Downloads a JSON snapshot of currently-configured controls, open exceptions, certificate state, baseline/drift status, and recent audit history -- useful for a security review, an MSP report, or audit preparation. This is evidence to support a review, not a compliance certification.', 'vcns-security-automation-manager' ); ?>
+		<?php esc_html_e( 'Downloads a JSON snapshot of currently-configured controls, open exceptions, certificate state, baseline/drift status, and recent audit history -- useful for a security review, an MSP report, or audit preparation. This is evidence to support a review, not a compliance certification. The export includes a checksum so later alteration can be detected.', 'vcns-security-automation-manager' ); ?>
 	</p>
 	<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 		<?php wp_nonce_field( 'wp_sam_export_evidence' ); ?>
 		<input type="hidden" name="action" value="wp_sam_export_evidence" />
+		<p>
+			<label for="wp_sam_evidence_period_from"><?php esc_html_e( 'Reporting period (optional):', 'vcns-security-automation-manager' ); ?></label>
+			<input type="date" id="wp_sam_evidence_period_from" name="period_from">
+			<?php esc_html_e( 'to', 'vcns-security-automation-manager' ); ?>
+			<input type="date" name="period_to">
+			<span class="description"><?php esc_html_e( 'Bounds only the recent-audit-history section; every other section is a snapshot of current configuration, which has no date range to narrow. Leave both blank for the full audit history.', 'vcns-security-automation-manager' ); ?></span>
+		</p>
 		<?php submit_button( __( 'Download Evidence Export', 'vcns-security-automation-manager' ), 'primary', '', false ); ?>
 	</form>
 
