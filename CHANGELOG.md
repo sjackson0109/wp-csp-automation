@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows semantic versioning for plugin releases.
 
+## [2.9.78] - 2026-09-07
+
+### Fixed
+
+- readme.txt's `== Changelog ==` section exceeded WordPress.org's 5,000-word budget for that section -- user-flagged from an SVN import warning banner ("visible only to the plugin authors & committers"): 69 version entries going back to 2.9.9 totalled roughly 6,300 words, past the point the readme parser silently truncates. Trimmed to the most recent 15 releases (2.9.78 down to 2.9.63, ~1,900 words); the pre-existing "Full changelog history" link immediately below them (to this file, on GitHub) already covers every older entry in full, so nothing is actually lost.
+- Added `VersionConsistencyTest::test_readme_changelog_section_is_within_the_wporg_word_budget()`, asserting the section stays under 4,000 words (a real margin below the 5,000-word cap, not right up against it) so a future release pushing it over is caught in CI instead of by another SVN warning.
+
 ## [2.9.77] - 2026-09-06
 
 ### Added

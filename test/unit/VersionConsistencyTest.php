@@ -192,6 +192,31 @@ class VersionConsistencyTest extends TestCase {
 	}
 
 	/**
+	 * WordPress.org's own readme parser caps the "== Changelog ==" section
+	 * at 5,000 words and silently truncates anything past that -- surfaced
+	 * as an authors/committers-only warning banner on the plugin's SVN
+	 * import, user-flagged 2026-09-07 after readme.txt had accumulated 69
+	 * version entries back to 2.9.9 (~6,300 words). Trimmed to the most
+	 * recent 15 releases plus the pre-existing "Full changelog history"
+	 * link to CHANGELOG.md, which already carries every entry in full.
+	 * Asserted well under the real 5,000-word cap (not right up against
+	 * it) so this is caught by CI with room to spare before the next
+	 * release pushes it over, rather than only found via another SVN
+	 * import warning.
+	 */
+	public function test_readme_changelog_section_is_within_the_wporg_word_budget(): void {
+		$root = dirname( __DIR__, 2 );
+
+		$changelog_section = $this->extract_readme_changelog_section( $root . '/readme.txt' );
+
+		$this->assertLessThanOrEqual(
+			4000,
+			str_word_count( $changelog_section ),
+			'readme.txt\'s "== Changelog ==" section is approaching WordPress.org\'s 5,000-word cap for that section -- trim the oldest entries (the "Full changelog history" link below them already covers the full record).'
+		);
+	}
+
+	/**
 	 * COMMERCIAL_TERMS.md still opened as "CSP Automation Manager" -- the
 	 * product's name from before the plugin was renamed to Security
 	 * Automation Manager (see CHANGELOG.md's [2.0.0] entry) to cover more
@@ -367,6 +392,17 @@ class VersionConsistencyTest extends TestCase {
 		preg_match( $pattern, $contents, $matches );
 
 		return trim( $matches[1] );
+	}
+
+	/** Everything from "== Changelog ==" to end of file -- readme.txt has no section after it. */
+	private function extract_readme_changelog_section( string $file ): string {
+		$contents = $this->read_file( $file );
+		$marker   = '== Changelog ==';
+		$position = strpos( $contents, $marker );
+
+		$this->assertIsInt( $position, 'readme.txt is missing its "== Changelog ==" section.' );
+
+		return substr( $contents, $position );
 	}
 
 	/**
