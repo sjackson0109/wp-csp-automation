@@ -977,6 +977,7 @@ if ( ! class_exists( 'wpdb_stub' ) ) {
 
 		public function get_results( string $query, string $output = 'ARRAY_A' ): array {
 			$GLOBALS['_wpdb_last_get_results_query'] = $query;
+			$GLOBALS['_wpdb_get_results_log'][]       = $query;
 			if ( ! empty( $GLOBALS['_wpdb_get_results_queue'] ) && is_array( $GLOBALS['_wpdb_get_results_queue'] ) ) {
 				return array_shift( $GLOBALS['_wpdb_get_results_queue'] );
 			}
@@ -1136,6 +1137,7 @@ function wp_test_reset_globals(): void {
 	$GLOBALS['_wpdb_get_results']        = [];
 	$GLOBALS['_wpdb_get_results_queue']  = [];
 	$GLOBALS['_wpdb_last_get_results_query'] = null;
+	$GLOBALS['_wpdb_get_results_log']    = [];
 	$GLOBALS['_wpdb_get_col']            = [];
 	$GLOBALS['_wpdb_insert_result']      = 1;
 	$GLOBALS['_wpdb_update_result']      = 0;

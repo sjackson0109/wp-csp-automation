@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows semantic versioning for plugin releases.
 
+## [2.9.80] - 2026-09-07
+
+### Fixed
+
+- The CSP dashboard (`page-csp-dashboard.php`) issued four `$wpdb->get_results()` calls unconditionally before any tab-specific branch ran -- policy profiles, the last 50 violations, conflict notices, and the last 20 scan-log rows -- regardless of which tab was actually being viewed (GitHub issue #166). Profiles and violations queries are now gated to only the tabs that read them (`profiles`/`policy-audit` for the former, `violations` for the latter, which already ran its own filtered/paginated re-query); the scan-log query is scoped to the Scan Log tab. Conflict notices remain unconditional, since that query feeds a banner shown on every tab. Added `PageCspDashboardTest::test_start_here_tab_issues_only_the_conflict_notices_query()` and three companion tests asserting exactly which tables each tab does and does not touch, using a new `$GLOBALS['_wpdb_get_results_log']` call-log added to the test `wpdb` stub.
+
 ## [2.9.79] - 2026-09-07
 
 ### Fixed
