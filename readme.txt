@@ -4,7 +4,7 @@ Tags: security, csp, content security policy, hsts, ssl certificates
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 2.9.78
+Stable tag: 2.9.79
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -115,6 +115,10 @@ When an administrator configures automatic cPanel deployment, once a certificate
 
 == Changelog ==
 
+= 2.9.79 =
+
+* Fixed: a customer's WP Engine site suffered PHP-FPM worker pool exhaustion (two outages in one morning) because the CSP violation-report endpoint had no request-level throttle and the default reporting transport (report-uri) fires one immediate, unbatched HTTP request per browser-side violation. The default reporting transport is now "both" (report-uri retained as a fallback, report-to added so supporting browsers batch delivery instead); existing installs still on the untouched report-uri-only default are migrated automatically. The report endpoint also now rejects a flooding sender with a 429 before any request body is parsed or written to the database, separate from and tighter than the existing hourly per-surface storage cap.
+
 = 2.9.78 =
 
 * Fixed: WordPress.org's SVN import warned (author/committer-only banner) that this section was truncated past its 5,000-word budget -- readme.txt had accumulated 69 version entries back to 2.9.9 (~6,300 words). Trimmed to the most recent 15 releases; the "Full changelog history" link below them already covers everything older via CHANGELOG.md. Added an automated test so this section approaching the word budget again is caught in CI, not by another SVN warning.
@@ -181,9 +185,5 @@ When an administrator configures automatic cPanel deployment, once a certificate
 = 2.9.64 =
 
 * Added: a full security-controls inventory document (`docs/security-controls-inventory.md`, GitHub issue #162) covering all 19 implemented HTTP security/content-protection controls -- purpose, supported surfaces, default state, report-only/enforcement/discovery capability, approval requirements, breakage risk, rollback behaviour, audit events, limitations, and relevant standards for each. Written from and grounded directly in the current codebase, not general assumptions about what a header "usually" does -- several non-obvious findings are called out explicitly, including that Reverse Tabnabbing Protection and External Script Integrity can, in practice, only ever be active on the frontend surface regardless of their admin/login/api configuration, and that Trusted Types' own code comment claiming "always report-only regardless of surface mode" does not match its actual behaviour on an enforce-mode surface (also corrected in the code itself as a documentation fix, not a behaviour change).
-
-= 2.9.63 =
-
-* Fixed: the External Scripts admin table's pagination never capped an out-of-range page number at the real last page (e.g. requesting page 9999 of a 3-page list rendered "Page 9999 of 3" instead of the last real page) -- every other paginated admin table in this plugin already clamped correctly; this was the one that didn't. Also added regression test coverage across all seven of this plugin's paginated admin tables (GitHub issue #167) confirming each one correctly caps out-of-range pages, preserves filters across a page change, and handles an empty result set without error.
 
 Full changelog history: https://github.com/vcns/security-automation-manager/blob/main/CHANGELOG.md
