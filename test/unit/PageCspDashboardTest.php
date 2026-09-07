@@ -8,10 +8,13 @@
  * fatal. Table_Query itself is already covered in isolation by
  * Admin/TableQueryTest.php; this exercises the actual require() chain.
  *
- * page-csp-dashboard.php unconditionally issues four $wpdb->get_results()
- * calls before any tab-specific branch runs (profiles, last-50 violations,
- * conflict notices, scan log) -- every fixture queue below reserves four
- * leading empty-array slots for those before its tab's own query/queries.
+ * page-csp-dashboard.php issues exactly one unconditional $wpdb->get_results()
+ * call before any tab-specific branch runs (the conflict-notices banner,
+ * shown on every tab) -- every fixture queue below reserves one leading
+ * empty-array slot for that before its tab's own query/queries. Profiles,
+ * violations, and scan-log queries are gated to the tabs that actually need
+ * them (issue #166); see the "Query scoping" section below for coverage of
+ * that gating itself.
  */
 
 declare( strict_types=1 );
@@ -179,11 +182,81 @@ class PageCspDashboardTest extends TestCase {
 		$this->assertStringNotContainsString( 'tablenav-pages', $output );
 	}
 
+	// ── Query scoping (issue #166) ──────────────────────────────────────────────
+	//
+	// page-csp-dashboard.php used to issue four $wpdb->get_results() calls
+	// (profiles, last-50 violations, conflict notices, scan log) before any
+	// tab branch ran, regardless of which tab was actually being viewed.
+	// Profiles, violations, and scan-log queries are now gated to the tabs
+	// that need them; conflict notices alone stays unconditional (it feeds a
+	// banner shown on every tab). These tests inspect
+	// $GLOBALS['_wpdb_get_results_log'] -- every query string the stub has
+	// seen this test -- rather than relying only on queue-shape side effects.
+
+	public function test_start_here_tab_issues_only_the_conflict_notices_query(): void {
+		$_GET['tab'] = 'start-here';
+
+		ob_start();
+		require WP_SAM_DIR . 'includes/admin/views/page-csp-dashboard.php';
+		ob_end_clean();
+
+		unset( $_GET['tab'] );
+
+		$this->assertCount( 1, $GLOBALS['_wpdb_get_results_log'] );
+		$this->assertStringContainsString( 'sam_audit_log', $GLOBALS['_wpdb_get_results_log'][0] );
+	}
+
+	public function test_sources_tab_does_not_query_profiles_violations_or_scan_logs(): void {
+		$_GET['tab']              = 'sources';
+		$GLOBALS['_wpdb_get_var'] = 0;
+
+		ob_start();
+		require WP_SAM_DIR . 'includes/admin/views/page-csp-dashboard.php';
+		ob_end_clean();
+
+		unset( $_GET['tab'] );
+
+		$queried = implode( "\n", $GLOBALS['_wpdb_get_results_log'] );
+		$this->assertStringNotContainsString( 'csp_policy_profiles', $queried );
+		$this->assertStringNotContainsString( 'csp_violation_reports', $queried );
+		$this->assertStringNotContainsString( 'sam_scan_logs', $queried );
+	}
+
+	public function test_profiles_tab_queries_the_profiles_table(): void {
+		$_GET['tab'] = 'profiles';
+		$GLOBALS['_wpdb_get_results_queue'] = array_merge( $this->leading_top_level_queries(), array( array() ) );
+
+		ob_start();
+		require WP_SAM_DIR . 'includes/admin/views/page-csp-dashboard.php';
+		ob_end_clean();
+
+		unset( $_GET['tab'] );
+
+		$queried = implode( "\n", $GLOBALS['_wpdb_get_results_log'] );
+		$this->assertStringContainsString( 'csp_policy_profiles', $queried );
+	}
+
+	public function test_policy_audit_tab_queries_the_profiles_table(): void {
+		// policy-audit has no re-query of its own -- it relies entirely on
+		// the gated top-level $profiles load, unlike every other tab here.
+		$_GET['tab'] = 'policy-audit';
+		$GLOBALS['_wpdb_get_results_queue'] = array_merge( $this->leading_top_level_queries(), array( array() ) );
+
+		ob_start();
+		require WP_SAM_DIR . 'includes/admin/views/page-csp-dashboard.php';
+		ob_end_clean();
+
+		unset( $_GET['tab'] );
+
+		$queried = implode( "\n", $GLOBALS['_wpdb_get_results_log'] );
+		$this->assertStringContainsString( 'csp_policy_profiles', $queried );
+	}
+
 	// ── Fixtures ─────────────────────────────────────────────────────────────────
 
-	/** @return array<int, array<int, mixed>> placeholder rows for the page's four unconditional top-of-file queries. */
+	/** @return array<int, array<int, mixed>> placeholder rows for the page's one unconditional top-of-file query (conflict notices). */
 	private function leading_top_level_queries(): array {
-		return array( array(), array(), array(), array() );
+		return array( array() );
 	}
 
 	/** @return array<int, array<string, mixed>> */

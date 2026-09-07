@@ -61,9 +61,15 @@ $tab_help = array(
 );
 
 // ── Data queries ──────────────────────────────────────────────────────────────
-// phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-$profiles_raw      = $wpdb->get_results( "SELECT * FROM {$wpdb->prefix}csp_policy_profiles ORDER BY surface", ARRAY_A );
-$profiles          = ! empty( $profiles_raw ) ? $profiles_raw : array();
+// $profiles is needed by both the Profiles tab and the Policy Audit tab (the
+// latter has no re-query of its own), so it's gated to those two rather than
+// re-queried inside each -- every other tab skips this table entirely.
+$profiles = array();
+if ( in_array( $tab, array( 'profiles', 'policy-audit' ), true ) ) {
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+	$profiles_raw = $wpdb->get_results( "SELECT * FROM {$wpdb->prefix}csp_policy_profiles ORDER BY surface", ARRAY_A );
+	$profiles     = ! empty( $profiles_raw ) ? $profiles_raw : array();
+}
 $surfaces          = array( 'frontend', 'admin', 'login', 'api' );
 $automation_config = ( new \WP_SAM\CSP\Automation_Config() )->all();
 $automation_labels = \WP_SAM\CSP\Automation_Config::mode_labels();
@@ -88,10 +94,8 @@ $per_page = 20;
 $page_num = max( 1, (int) ( isset( $_GET['paged'] ) ? $_GET['paged'] : 1 ) );
 $offset   = ( $page_num - 1 ) * $per_page;
 
-// Violations – last 50.
-// phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-$violations_raw = $wpdb->get_results( "SELECT * FROM {$wpdb->prefix}csp_violation_reports ORDER BY reported_at DESC LIMIT 50", ARRAY_A );
-$violations     = ! empty( $violations_raw ) ? $violations_raw : array();
+// Violations are queried in full (filtered, sorted, paginated) inside the
+// Violations tab's own branch below -- no other tab reads them.
 
 // Recent competing-CSP-header findings (persistent banner below, visible on
 // every tab). Conflict_Detector's header/htaccess/probe checks and
@@ -120,10 +124,8 @@ $conflict_notices_raw = $wpdb->get_results(
 );
 $conflict_notices     = ! empty( $conflict_notices_raw ) ? $conflict_notices_raw : array();
 
-// Scan log – last 20 runs.
-// phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-$scan_logs_raw = $wpdb->get_results( "SELECT * FROM {$wpdb->prefix}sam_scan_logs ORDER BY started_at DESC LIMIT 20", ARRAY_A );
-$scan_logs     = ! empty( $scan_logs_raw ) ? $scan_logs_raw : array();
+// Scan log is queried inside the Scan Log tab's own branch below -- no other
+// tab reads it.
 ?>
 <div class="wrap wp-sam-wrap">
 	<h1><?php esc_html_e( 'CSP', 'vcns-security-automation-manager' ); ?></h1>
@@ -232,9 +234,8 @@ $scan_logs     = ! empty( $scan_logs_raw ) ? $scan_logs_raw : array();
 	<?php elseif ( 'profiles' === $tab ) : ?>
 	<!-- ── Profiles tab ───────────────────────────────────────────────────── -->
 		<?php
-	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- No user input; only $wpdb->prefix used in query.
-		$profiles_raw = $wpdb->get_results( "SELECT * FROM {$wpdb->prefix}csp_policy_profiles ORDER BY surface", ARRAY_A );
-		$profiles     = ! empty( $profiles_raw ) ? $profiles_raw : array();
+		// $profiles is already loaded above (gated to the profiles/policy-audit
+		// tabs) -- no need to re-query it here.
 
 		// Violation counts for the (directive, blocked_uri) pairs the Bypass
 		// Best Practices catalog covers, so each toggle can show "why" -- these

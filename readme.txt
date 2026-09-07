@@ -4,7 +4,7 @@ Tags: security, csp, content security policy, hsts, ssl certificates
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 2.9.79
+Stable tag: 2.9.80
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -115,6 +115,10 @@ When an administrator configures automatic cPanel deployment, once a certificate
 
 == Changelog ==
 
+= 2.9.80 =
+
+* Fixed: the CSP dashboard queried the policy-profiles, last-50-violations, and scan-log tables unconditionally on every page load regardless of which tab was open (GitHub issue #166) -- viewing e.g. Settings or Start Here still fired three unneeded queries. Profiles and violations queries are now scoped to only the tabs that actually use them; the scan-log query is scoped to the Scan Log tab.
+
 = 2.9.79 =
 
 * Fixed: a customer's WP Engine site suffered PHP-FPM worker pool exhaustion (two outages in one morning) because the CSP violation-report endpoint had no request-level throttle and the default reporting transport (report-uri) fires one immediate, unbatched HTTP request per browser-side violation. The default reporting transport is now "both" (report-uri retained as a fallback, report-to added so supporting browsers batch delivery instead); existing installs still on the untouched report-uri-only default are migrated automatically. The report endpoint also now rejects a flooding sender with a 429 before any request body is parsed or written to the database, separate from and tighter than the existing hourly per-surface storage cap.
@@ -181,9 +185,5 @@ When an administrator configures automatic cPanel deployment, once a certificate
 = 2.9.65 =
 
 * Fixed: several documentation files had drifted from the current codebase (GitHub issue #163) -- SECURITY.md's supported-versions table still named a years-old release line (now an evergreen "latest version only" policy that can't go stale the same way again); COMMERCIAL_TERMS.md still referred to the plugin by its pre-rename name, "CSP Automation Manager"; docs/architecture.md and docs/testing-and-quality.md still referenced database table and option names renamed away in schema v9; docs/database-schema.md's version history table stopped at schema v12 while the plugin has shipped 24 schema versions since. All corrected, and extended the automated documentation-consistency test suite so drift like this is caught by CI going forward rather than found by manual audit again.
-
-= 2.9.64 =
-
-* Added: a full security-controls inventory document (`docs/security-controls-inventory.md`, GitHub issue #162) covering all 19 implemented HTTP security/content-protection controls -- purpose, supported surfaces, default state, report-only/enforcement/discovery capability, approval requirements, breakage risk, rollback behaviour, audit events, limitations, and relevant standards for each. Written from and grounded directly in the current codebase, not general assumptions about what a header "usually" does -- several non-obvious findings are called out explicitly, including that Reverse Tabnabbing Protection and External Script Integrity can, in practice, only ever be active on the frontend surface regardless of their admin/login/api configuration, and that Trusted Types' own code comment claiming "always report-only regardless of surface mode" does not match its actual behaviour on an enforce-mode surface (also corrected in the code itself as a documentation fix, not a behaviour change).
 
 Full changelog history: https://github.com/vcns/security-automation-manager/blob/main/CHANGELOG.md
