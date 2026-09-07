@@ -325,7 +325,7 @@
           </article>
           <article class='faq-item'>
             <h3>What about older browsers?</h3>
-            <p>Some reporting and CSP3 behaviour varies by browser. The plugin uses direct report-uri delivery by default for faster local learning, and can emit Reporting API headers when enabled in Settings.</p>
+            <p>Some reporting and CSP3 behaviour varies by browser. By default the plugin emits both direct report-uri delivery and Reporting API headers together, so older browsers still get prompt, direct reports while newer ones batch their delivery via the Reporting API. You can restrict this to one transport or the other in Settings.</p>
           </article>
         </div>
       </section>

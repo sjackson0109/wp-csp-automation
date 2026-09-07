@@ -452,12 +452,15 @@ final class Plugin {
 	// ── REST routes ───────────────────────────────────────────────────────────
 
 	public function register_rest_routes(): void {
-		// CSP violation report – public, from browsers.
+		// CSP violation report – public, from browsers. permission_callback
+		// is Violation_Reporter's own early flood check (see its docblock),
+		// not a bare '__return_true' -- a flooding sender is rejected before
+		// handle() ever runs its JSON-decode/DB-upsert work.
 		$violation_reporter = new Violation_Reporter( $this->audit, $this->learning_window );
 		$report_route_args  = array(
 			'methods'             => \WP_REST_Server::CREATABLE,
 			'callback'            => array( $violation_reporter, 'handle' ),
-			'permission_callback' => '__return_true',
+			'permission_callback' => array( $violation_reporter, 'check_not_flooding' ),
 		);
 
 		register_rest_route( 'sam/v1', '/report', $report_route_args );

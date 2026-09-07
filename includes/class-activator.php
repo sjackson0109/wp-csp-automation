@@ -39,6 +39,7 @@ class Activator {
 		self::migrate_tighten_img_src_default();
 		self::migrate_loosen_media_src_default();
 		self::migrate_consolidate_bypass_flags_into_json();
+		self::migrate_default_reporting_transport_to_both();
 		self::set_default_options();
 		self::seed_default_profiles();
 		self::seed_default_pillar_profiles();
@@ -146,6 +147,36 @@ class Activator {
 				array( '%s' ),
 				array( '%d' )
 			);
+		}
+	}
+
+	/**
+	 * Schema v39: flips an existing install's wp_sam_reporting_transport off
+	 * the original 'report-uri'-only default to 'both' -- see the option's
+	 * own comment in set_default_options() for why. A fresh install never
+	 * needs this: set_default_options() below only ever adds an option that
+	 * doesn't already exist, so a genuinely new site simply gets 'both'
+	 * seeded directly and this method's own get_option() call (default
+	 * false, not 'report-uri') sees nothing to migrate.
+	 *
+	 * Deliberately NOT re-checked on every future activation the way
+	 * migrate_tighten_img_src_default() above is: that migration's condition
+	 * (an exact old hardcoded directive array) can never again match real
+	 * admin intent once changed, but 'report-uri' stays a normal, selectable
+	 * choice in this option's own admin UI after this migration runs --
+	 * an administrator who deliberately switches back to it later must not
+	 * have that choice silently reverted by some unrelated future schema
+	 * bump calling activate() again. Guarded by its own one-time completion
+	 * marker instead.
+	 */
+	private static function migrate_default_reporting_transport_to_both(): void {
+		if ( get_option( 'wp_sam_reporting_transport_defaulted_v39', false ) ) {
+			return;
+		}
+		update_option( 'wp_sam_reporting_transport_defaulted_v39', true );
+
+		if ( 'report-uri' === get_option( 'wp_sam_reporting_transport', false ) ) {
+			update_option( 'wp_sam_reporting_transport', 'both' );
 		}
 	}
 
@@ -1541,9 +1572,17 @@ class Activator {
 			// Blank uses rest_url( 'sam/v1/report' ); set only when a
 			// public proxy/CDN hostname must be advertised to browsers.
 			'wp_sam_report_endpoint_url'           => '',
-			// Direct report-uri reporting is the default because it gives the
-			// fastest feedback loop for report-endpoint learning.
-			'wp_sam_reporting_transport'           => 'report-uri',
+			// 'both' emits report-uri AND report-to together: a browser that
+			// supports the Reporting API batches violations via report-to and
+			// ignores report-uri; one that doesn't still gets the immediate
+			// report-uri fallback. Direct report-uri alone was the original
+			// default (fastest feedback loop for report-endpoint learning),
+			// but every violation fires its own immediate, unbatched request
+			// -- a user-reported production incident traced an unthrottled
+			// violation storm from exactly this to a customer's PHP-FPM
+			// worker pool being exhausted. See migrate_default_reporting_
+			// transport_to_both() below for the existing-install migration.
+			'wp_sam_reporting_transport'           => 'both',
 			// Blank emits normal CSP headers. Set only when an edge proxy copies
 			// an origin-only policy header back to a browser-facing CSP header.
 			'wp_sam_policy_header_name'            => '',

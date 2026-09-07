@@ -208,6 +208,7 @@ class PolicyBuilderTest extends TestCase {
 	// ── reporting directives ──────────────────────────────────────────────────
 
 	public function test_build_appends_report_uri(): void {
+		update_option( 'wp_sam_reporting_transport', 'report-uri' );
 		$profile = $this->make_profile( [ 'default-src' => [ "'none'" ] ] );
 
 		$policy = $this->builder->build_policy_string( $profile, 'frontend' );
@@ -215,6 +216,24 @@ class PolicyBuilderTest extends TestCase {
 		$this->assertStringContainsString( 'report-uri', $policy );
 		$this->assertStringContainsString( 'sam/v1/report', $policy );
 		$this->assertStringNotContainsString( 'report-to csp-endpoint', $policy );
+	}
+
+	/**
+	 * 'both', not 'report-uri' alone, is the default as of schema v39 (see
+	 * Activator::migrate_default_reporting_transport_to_both()) -- a
+	 * report-uri-only default let one unthrottled violation storm exhaust a
+	 * customer's PHP-FPM worker pool in production. Browsers that support
+	 * the Reporting API batch via report-to and ignore report-uri; those
+	 * that don't still get the report-uri fallback.
+	 */
+	public function test_build_appends_both_transports_by_default(): void {
+		$profile = $this->make_profile( [ 'default-src' => [ "'none'" ] ] );
+
+		$policy = $this->builder->build_policy_string( $profile, 'frontend' );
+
+		$this->assertStringContainsString( 'report-uri', $policy );
+		$this->assertStringContainsString( 'sam/v1/report', $policy );
+		$this->assertStringContainsString( 'report-to csp-endpoint', $policy );
 	}
 
 	public function test_build_uses_configured_report_endpoint_url(): void {
