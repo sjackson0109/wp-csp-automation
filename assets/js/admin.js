@@ -38,6 +38,14 @@
 		const surface = $btn.data( 'surface' );
 		const mode    = $btn.data( 'mode' );
 
+		let reason = '';
+		if ( mode === 'enforce' ) {
+			reason = requiredReason( wpSamAdmin.i18n.enforceReasonPrompt || 'Reason for promoting this surface to enforce mode:' );
+			if ( reason === null ) {
+				return;
+			}
+		}
+
 		$btn.prop( 'disabled', true );
 
 		$.post( wpSamAdmin.ajaxUrl, {
@@ -45,6 +53,7 @@
 			nonce:   wpSamAdmin.nonce,
 			surface: surface,
 			mode:    mode,
+			reason:  reason,
 		} )
 		.done( function ( res ) {
 			if ( res.success ) {

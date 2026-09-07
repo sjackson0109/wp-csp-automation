@@ -4,7 +4,7 @@ Tags: security, csp, content security policy, hsts, ssl certificates
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 2.9.83
+Stable tag: 2.9.84
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -115,6 +115,10 @@ When an administrator configures automatic cPanel deployment, once a certificate
 
 == Changelog ==
 
+= 2.9.84 =
+
+* Added: promoting a CSP surface to enforce mode now requires a written reason (GitHub issue #179), and passes three more automated checks before it's allowed: no active exception covering that surface (see the new Exceptions tab), no source candidates still awaiting an approve/reject decision, and no competing Content-Security-Policy header detected in the last 48 hours. Existing checks (approved sources/hashes present, no recent violations) are unchanged.
+
 = 2.9.83 =
 
 * Added: Exceptions (Settings/Overview > Exceptions, GitHub issue #177) -- record a controlled, time-bound weakening of a control or surface (a legacy integration, a third-party embed) as an auditable exception instead of a silent override. Requires a business justification and an owner; requires an expiry date unless a privileged override is used. A daily check automatically returns an exception to review once it expires, and emails the configured admin address as one approaches expiry. Every creation, extension, and revocation is written to the audit log.
@@ -181,9 +185,5 @@ When an administrator configures automatic cPanel deployment, once a certificate
 = 2.9.69 =
 
 * Added: plain-language explainer text on the Content Security Policy dashboard's Profiles, For Review, Policy Audit, Violations, Scan Log, and Settings tabs. Second installment of the UI documentation retrofit -- explains what each tab's data actually means and why it matters (e.g. why Occurrences never resets, what a "scan" actually checks, what the Trusted Types and Bypass Best Practices toggles are for) rather than leaving the reader to infer it from column headers and filter fields alone. Start Here already had this treatment and was left unchanged.
-
-= 2.9.68 =
-
-* Fixed: the "Settings" link on the Plugins list page pointed at the Content Security Policy dashboard's own Settings tab instead of the plugin's actual landing page. It now goes to Settings/Overview, matching the top-level admin menu's own first entry (also labelled "Settings").
 
 Full changelog history: https://github.com/vcns/security-automation-manager/blob/main/CHANGELOG.md

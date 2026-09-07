@@ -255,4 +255,34 @@ class Conflict_Detector {
 			default           => 'Review other CSP emitters before enabling enforcement here.',
 		};
 	}
+
+	/**
+	 * True when a competing-CSP-header finding has been recorded within the
+	 * last $window_hours -- the same signal and window page-csp-dashboard.
+	 * php's own conflict-notices banner already uses, exposed here as a
+	 * reusable query instead of a third copy of the same SQL (GitHub issue
+	 * #179's "no known conflicts" promotion gate). Conflicts are recorded
+	 * against the site as a whole, not per-surface -- CSP headers aren't
+	 * surface-scoped at the HTTP layer the way this plugin's own policy
+	 * configuration is, so this check is deliberately not parameterised by
+	 * surface either.
+	 */
+	public function has_recent_conflicts( int $window_hours = 48 ): bool {
+		global $wpdb;
+		$cutoff = gmdate( 'Y-m-d H:i:s', time() - ( $window_hours * HOUR_IN_SECONDS ) );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$count = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				"SELECT COUNT(*) FROM {$wpdb->prefix}sam_audit_log
+				WHERE component = %s AND severity = %s AND created_at > %s",
+				'conflict_detector',
+				'warning',
+				$cutoff
+			)
+		);
+
+		return $count > 0;
+	}
 }
