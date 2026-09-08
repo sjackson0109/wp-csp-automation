@@ -574,6 +574,9 @@ $tab_help = array(
 		$editing_vendor  = '' !== $edit_vendor_key ? $vendor_store->get( $edit_vendor_key ) : null;
 		?>
 
+		<p class="description">
+			<a href="https://github.com/vcns/security-automation-manager/blob/main/docs/scanner-vendor-research.md" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Vendor research: sourcing for every built-in entry, plus researched-but-not-built-in commercial scanners and monitoring bots', 'vcns-security-automation-manager' ); ?></a>
+		</p>
 		<table class="widefat fixed striped wp-sam-violations-table wp-sam-vendors-table" style="margin-top:1em">
 			<thead>
 				<tr>

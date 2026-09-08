@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows semantic versioning for plugin releases.
 
+## [2.9.90] - 2026-09-08
+
+### Added
+
+- Schema v41 (`Activator::seed_default_scanner_vendors()`): 10 more built-in `sam_scanner_vendors` entries -- YandexBot, Baiduspider, DuckDuckBot, Applebot, Sogou web spider, SeznamBot, OAI-SearchBot, Amazonbot, DuckAssistBot, and Meta-ExternalAgent -- bringing the built-in catalogue from 6 to 16. Each independently confirmed against the vendor's own current documentation (8 September 2026): 8 via forward-confirmed reverse DNS or a published CIDR JSON, and Meta-ExternalAgent via `verification_method = 'none'` since Meta documents the user agent but publishes neither an IP range nor a DNS suffix for it -- an honest recognition-only entry rather than a fabricated verified one.
+- New `docs/scanner-vendor-research.md`, linked from Continuous Intelligence > Vendors: full sourcing for the 16 built-ins, plus researched-but-deliberately-not-built-in commercial/research scanners (Qualys, Tenable, Rapid7, Invicti, Acunetix, Detectify, Burp Suite, Intruder.io, Probely, WPScan, Sucuri SiteCheck) and monitoring/SEO/archive bots (UptimeRobot, Pingdom, StatusCake, Censys, Shodan, SecurityTrails, Internet Archive, Ahrefs, Semrush, Majestic, Moz) -- excluded from built-in seeding per `Scanner_Vendor_Store`'s own existing policy (ranges that change over time, or vendors with no distinctive user agent), catalogued instead for an administrator to add manually with a source they trust.
+- A handful of other researched candidates (Naver/Yeti, Mail.RU_Bot, PetalBot, Bytespider, Diffbot, ImagesiftBot, Timpibot, omgili) are documented in the same file as explicitly **not independently verified** -- no reachable vendor-owned page confirmed a formal mechanism -- rather than seeded on secondhand or inconsistent evidence.
+
 ## [2.9.89] - 2026-09-08
 
 ### Fixed

@@ -1867,6 +1867,45 @@ class Activator {
 	 * (support.claude.com, article 8896518), Common Crawl (commoncrawl.org/
 	 * ccbot), Perplexity (docs.perplexity.ai/guides/bots).
 	 *
+	 * Schema v41 adds ten more, each independently confirmed against the
+	 * vendor's own current documentation (8 September 2026), same two
+	 * verification shapes plus a third for the one vendor that documents
+	 * neither:
+	 * - fcrdns: YandexBot (yandex.com/support/webmaster), Baiduspider
+	 *   (ziyuan.baidu.com, Chinese-language source), Applebot
+	 *   (support.apple.com/en-us/119829 -- Applebot-Extended is a
+	 *   training-use signal carried by this same crawler, not a separate
+	 *   one, so it isn't a separate catalogue row), Sogou web spider
+	 *   (zhanzhang.sogou.com, Chinese-language source), SeznamBot
+	 *   (o-seznam.cz/napoveda).
+	 * - cidr (ranges left empty, same rationale as above): DuckDuckBot
+	 *   (duckduckgo.com/duckduckbot.json), OAI-SearchBot -- OpenAI's
+	 *   separate ChatGPT-search crawler, distinct from GPTBot
+	 *   (openai.com/searchbot.json), Amazonbot (developer.amazon.com/
+	 *   amazonbot/ip-addresses/), DuckAssistBot -- DuckDuckGo's separate
+	 *   AI-answers crawler, distinct from DuckDuckBot
+	 *   (duckduckgo.com/duckassistbot.json).
+	 * - none: Meta-ExternalAgent (developers.facebook.com/docs/sharing/
+	 *   webmasters/web-crawlers) -- Meta documents this user agent but
+	 *   publishes no IP range or reverse-DNS suffix for it, so this entry
+	 *   is honestly recognition-only; traffic claiming this identity
+	 *   resolves to Bot_Classifier's claimed_crawler_unverified state
+	 *   rather than a fabricated verified one.
+	 * Several other researched candidates were deliberately left out of
+	 * this catalogue rather than seeded on partial evidence: Naver
+	 * (Yeti), Mail.RU_Bot, and Bytespider's official documentation pages
+	 * could not be independently confirmed (JS-rendered, geo-blocked, or
+	 * unreachable); PetalBot's own vendor page names two different
+	 * hostname domains for the same claim and wasn't trusted as-is;
+	 * Google-Extended has no HTTP user agent of its own to match against
+	 * (it's a robots.txt-only control token read via the existing
+	 * Googlebot entry). Commercial scanners and monitoring/SEO crawlers
+	 * researched in the same pass (Qualys, Tenable, Ahrefs, etc.) are
+	 * intentionally not built-in rows at all -- see this method's
+	 * existing rationale above; they're catalogued instead in
+	 * docs/scanner-vendor-research.md for an administrator to add
+	 * manually once they have a source they trust.
+	 *
 	 * Idempotent like seed_default_pillar_profiles() above: only inserts a
 	 * vendor_key that doesn't already exist, so an administrator's own edit
 	 * to a built-in row (e.g. adding a verified CIDR range once they have
@@ -1937,6 +1976,106 @@ class Activator {
 				'source_url'          => 'https://www.perplexity.com/perplexitybot.json',
 				'verification_method' => 'cidr',
 				'notes'               => 'Perplexity verifies PerplexityBot by published IP range, not reverse DNS. No ranges are hardcoded here; add current ranges from the source URL above via this form if you want IP-match verification.',
+			),
+			array(
+				'vendor_key'          => 'yandexbot',
+				'vendor_name'         => 'YandexBot',
+				'category'            => 'known_crawler',
+				'ua_pattern'          => 'YandexBot',
+				'rdns_suffixes'       => array( 'yandex.ru', 'yandex.net', 'yandex.com' ),
+				'source_url'          => 'https://yandex.com/support/webmaster/en/robot-workings/check-yandex-robots',
+				'verification_method' => 'fcrdns',
+				'notes'               => "Verify via forward-confirmed reverse DNS against a hostname ending in yandex.ru, yandex.net, or yandex.com, per Yandex's own published verification method.",
+			),
+			array(
+				'vendor_key'          => 'baiduspider',
+				'vendor_name'         => 'Baiduspider',
+				'category'            => 'known_crawler',
+				'ua_pattern'          => 'Baiduspider',
+				'rdns_suffixes'       => array( 'baidu.com', 'baidu.jp' ),
+				'source_url'          => 'https://ziyuan.baidu.com/college/articleinfo?id=1193',
+				'verification_method' => 'fcrdns',
+				'notes'               => "Verify via forward-confirmed reverse DNS against a hostname ending in baidu.com or baidu.jp, per Baidu's own published verification method (Chinese-language source).",
+			),
+			array(
+				'vendor_key'          => 'duckduckbot',
+				'vendor_name'         => 'DuckDuckBot',
+				'category'            => 'known_crawler',
+				'ua_pattern'          => 'DuckDuckBot',
+				'rdns_suffixes'       => array(),
+				'source_url'          => 'https://duckduckgo.com/duckduckbot.json',
+				'verification_method' => 'cidr',
+				'notes'               => 'DuckDuckGo verifies DuckDuckBot by published IP range, not reverse DNS. No ranges are hardcoded here; add current ranges from the source URL above via this form if you want IP-match verification.',
+			),
+			array(
+				'vendor_key'          => 'applebot',
+				'vendor_name'         => 'Applebot (Apple)',
+				'category'            => 'known_crawler',
+				'ua_pattern'          => 'Applebot',
+				'rdns_suffixes'       => array( 'applebot.apple.com' ),
+				'source_url'          => 'https://support.apple.com/en-us/119829',
+				'verification_method' => 'fcrdns',
+				'notes'               => 'Verify via forward-confirmed reverse DNS against a hostname ending in applebot.apple.com (Apple also publishes a CIDR JSON as an alternative). Applebot-Extended is a training-use signal carried by this same crawler, not a separate one -- it uses the identical Applebot/0.1 user agent.',
+			),
+			array(
+				'vendor_key'          => 'sogou',
+				'vendor_name'         => 'Sogou web spider',
+				'category'            => 'known_crawler',
+				'ua_pattern'          => 'Sogou web spider',
+				'rdns_suffixes'       => array( 'sogou.com' ),
+				'source_url'          => 'https://zhanzhang.sogou.com/index.php/help/spider',
+				'verification_method' => 'fcrdns',
+				'notes'               => "Verify via forward-confirmed reverse DNS against a hostname ending in sogou.com, per Sogou's own Resource Platform (Chinese-language source).",
+			),
+			array(
+				'vendor_key'          => 'seznambot',
+				'vendor_name'         => 'SeznamBot',
+				'category'            => 'known_crawler',
+				'ua_pattern'          => 'SeznamBot',
+				'rdns_suffixes'       => array( 'seznam.cz' ),
+				'source_url'          => 'https://o-seznam.cz/napoveda/vyhledavani/en/seznambot-crawler/',
+				'verification_method' => 'fcrdns',
+				'notes'               => 'Verify via forward-confirmed reverse DNS against a hostname ending in seznam.cz. Seznam also publishes fixed IPv4/IPv6 ranges and a JSON list as an alternative.',
+			),
+			array(
+				'vendor_key'          => 'oai-searchbot',
+				'vendor_name'         => 'OAI-SearchBot (OpenAI)',
+				'category'            => 'known_crawler',
+				'ua_pattern'          => 'OAI-SearchBot',
+				'rdns_suffixes'       => array(),
+				'source_url'          => 'https://openai.com/searchbot.json',
+				'verification_method' => 'cidr',
+				'notes'               => "OpenAI's separate crawler for ChatGPT search results (distinct from GPTBot, which is used for training). Verifies by published IP range, not reverse DNS. No ranges are hardcoded here; add current ranges from the source URL above via this form if you want IP-match verification.",
+			),
+			array(
+				'vendor_key'          => 'amazonbot',
+				'vendor_name'         => 'Amazonbot',
+				'category'            => 'known_crawler',
+				'ua_pattern'          => 'Amazonbot',
+				'rdns_suffixes'       => array(),
+				'source_url'          => 'https://developer.amazon.com/amazonbot/ip-addresses/',
+				'verification_method' => 'cidr',
+				'notes'               => "Amazon verifies Amazonbot by published IP range, not reverse DNS -- a *.crawl.amazonbot.amazon reverse-DNS suffix circulates on third-party sites but does not appear on Amazon's own page, so it isn't used here. No ranges are hardcoded here; add current ranges from the source URL above via this form if you want IP-match verification.",
+			),
+			array(
+				'vendor_key'          => 'duckassistbot',
+				'vendor_name'         => 'DuckAssistBot (DuckDuckGo)',
+				'category'            => 'known_crawler',
+				'ua_pattern'          => 'DuckAssistBot',
+				'rdns_suffixes'       => array(),
+				'source_url'          => 'https://duckduckgo.com/duckassistbot.json',
+				'verification_method' => 'cidr',
+				'notes'               => "DuckDuckGo's separate crawler for its AI-assisted answers feature (distinct from DuckDuckBot, which is used for search indexing). Verifies by published IP range, not reverse DNS. No ranges are hardcoded here; add current ranges from the source URL above via this form if you want IP-match verification.",
+			),
+			array(
+				'vendor_key'          => 'meta-externalagent',
+				'vendor_name'         => 'Meta-ExternalAgent (Meta)',
+				'category'            => 'known_crawler',
+				'ua_pattern'          => 'meta-externalagent',
+				'rdns_suffixes'       => array(),
+				'source_url'          => 'https://developers.facebook.com/docs/sharing/webmasters/web-crawlers',
+				'verification_method' => 'none',
+				'notes'               => "Meta's AI-training crawler (distinct from the older facebookexternalhit link-preview fetcher). Meta documents this user agent but does not publish a fixed IP range or reverse-DNS suffix for it -- recognition-only; traffic claiming this identity is correctly shown as unverified rather than confirmed.",
 			),
 		);
 
