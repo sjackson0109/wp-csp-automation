@@ -232,7 +232,7 @@ $tab_help = array(
 			</form>
 		</details>
 
-		<table class="widefat fixed striped wp-sam-violations-table" style="margin-top:1em">
+		<table class="widefat fixed striped wp-sam-violations-table wp-sam-events-table" style="margin-top:1em">
 			<thead>
 				<tr>
 					<?php
@@ -344,7 +344,7 @@ $tab_help = array(
 		);
 		$sort           = Table_Query::resolve_sort(
 			$sort_whitelist,
-			'last_seen',
+			'occurrences',
 			isset( $_GET['sort'] ) ? sanitize_text_field( wp_unslash( $_GET['sort'] ) ) : null, // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 			isset( $_GET['dir'] ) ? sanitize_text_field( wp_unslash( $_GET['dir'] ) ) : null // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		);
@@ -455,7 +455,7 @@ $tab_help = array(
 			</form>
 		</details>
 
-		<table class="widefat fixed striped wp-sam-violations-table" style="margin-top:1em">
+		<table class="widefat fixed striped wp-sam-violations-table wp-sam-identities-table" style="margin-top:1em">
 			<thead>
 				<tr>
 					<?php
@@ -508,14 +508,24 @@ $tab_help = array(
 				<td><?php echo esc_html( number_format( (int) $row['occurrence_count'] ) ); ?></td>
 				<td><?php echo esc_html( (string) $row['last_seen_at'] ); ?></td>
 				<td>
-					<?php if ( $is_decided ) : ?>
+					<?php if ( 'loopback' === $state ) : ?>
+						<span class="description wp-sam-auto-authorised" title="<?php esc_attr_e( 'This server calling itself is treated as authorised automatically. If a reverse proxy on this site terminates every visitor connection via loopback, deny it below to override that.', 'vcns-security-automation-manager' ); ?>"><?php esc_html_e( 'Auto-authorised (loopback)', 'vcns-security-automation-manager' ); ?></span>
+						<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="display:inline-block;margin-top:4px">
+							<?php wp_nonce_field( 'wp_sam_scanner_identity_decide' ); ?>
+							<input type="hidden" name="action" value="wp_sam_scanner_identity_decide" />
+							<input type="hidden" name="identity_id" value="<?php echo esc_attr( (string) $row['id'] ); ?>" />
+							<input type="hidden" name="wp_sam_return_tab" value="identities" />
+							<input type="text" name="note" placeholder="<?php esc_attr_e( 'Reason', 'vcns-security-automation-manager' ); ?>" required style="width:200px" />
+							<button type="submit" name="decision" value="deny" class="button button-small"><?php esc_html_e( 'Not this server? Deny', 'vcns-security-automation-manager' ); ?></button>
+						</form>
+					<?php elseif ( $is_decided ) : ?>
 						<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="display:inline">
 							<?php wp_nonce_field( 'wp_sam_scanner_identity_decide' ); ?>
 							<input type="hidden" name="action" value="wp_sam_scanner_identity_decide" />
 							<input type="hidden" name="identity_id" value="<?php echo esc_attr( (string) $row['id'] ); ?>" />
 							<input type="hidden" name="decision" value="clear" />
 							<input type="hidden" name="wp_sam_return_tab" value="identities" />
-							<input type="text" name="note" placeholder="<?php esc_attr_e( 'Reason', 'vcns-security-automation-manager' ); ?>" required style="width:110px" />
+							<input type="text" name="note" placeholder="<?php esc_attr_e( 'Reason', 'vcns-security-automation-manager' ); ?>" required style="width:200px" />
 							<?php submit_button( __( 'Clear decision', 'vcns-security-automation-manager' ), 'secondary small', '', false ); ?>
 						</form>
 					<?php else : ?>
@@ -524,7 +534,7 @@ $tab_help = array(
 							<input type="hidden" name="action" value="wp_sam_scanner_identity_decide" />
 							<input type="hidden" name="identity_id" value="<?php echo esc_attr( (string) $row['id'] ); ?>" />
 							<input type="hidden" name="wp_sam_return_tab" value="identities" />
-							<input type="text" name="note" placeholder="<?php esc_attr_e( 'Reason', 'vcns-security-automation-manager' ); ?>" required style="width:110px" />
+							<input type="text" name="note" placeholder="<?php esc_attr_e( 'Reason', 'vcns-security-automation-manager' ); ?>" required style="width:200px" />
 							<button type="submit" name="decision" value="authorise" class="button button-primary button-small"><?php esc_html_e( 'Authorise', 'vcns-security-automation-manager' ); ?></button>
 							<button type="submit" name="decision" value="deny" class="button button-small"><?php esc_html_e( 'Deny', 'vcns-security-automation-manager' ); ?></button>
 						</form>
@@ -564,7 +574,7 @@ $tab_help = array(
 		$editing_vendor  = '' !== $edit_vendor_key ? $vendor_store->get( $edit_vendor_key ) : null;
 		?>
 
-		<table class="widefat fixed striped wp-sam-violations-table" style="margin-top:1em">
+		<table class="widefat fixed striped wp-sam-violations-table wp-sam-vendors-table" style="margin-top:1em">
 			<thead>
 				<tr>
 					<th><?php esc_html_e( 'Vendor', 'vcns-security-automation-manager' ); ?></th>
@@ -621,25 +631,26 @@ $tab_help = array(
 			</tbody>
 		</table>
 
-		<h2 id="wp-sam-vendor-form" style="margin-top:2em">
-			<?php
-			if ( null !== $editing_vendor ) {
-				printf(
-					/* translators: %s: vendor name being edited */
-					esc_html__( 'Edit vendor: %s', 'vcns-security-automation-manager' ),
-					esc_html( (string) $editing_vendor['vendor_name'] )
-				);
-			} else {
-				esc_html_e( 'Add a vendor', 'vcns-security-automation-manager' );
-			}
-			?>
-		</h2>
-		<p class="description"><?php esc_html_e( 'A source URL is required so the record stays traceable to where the verification method came from.', 'vcns-security-automation-manager' ); ?></p>
-		<?php if ( null !== $editing_vendor && ! empty( $editing_vendor['is_builtin'] ) ) : ?>
-		<p class="description"><?php esc_html_e( 'This is a built-in vendor -- it can be edited (for example, to add a published CIDR range once verified) but not deleted or renamed.', 'vcns-security-automation-manager' ); ?></p>
-		<?php endif; ?>
-		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="wp-sam-vendor-form">
-			<?php wp_nonce_field( 'wp_sam_scanner_vendor_upsert' ); ?>
+		<details class="wp-sam-filter-form" id="wp-sam-vendor-form" style="margin-top:2em"<?php echo null !== $editing_vendor ? ' open' : ''; ?>>
+			<summary>
+				<?php
+				if ( null !== $editing_vendor ) {
+					printf(
+						/* translators: %s: vendor name being edited */
+						esc_html__( 'Edit vendor: %s', 'vcns-security-automation-manager' ),
+						esc_html( (string) $editing_vendor['vendor_name'] )
+					);
+				} else {
+					esc_html_e( 'Add a vendor', 'vcns-security-automation-manager' );
+				}
+				?>
+			</summary>
+			<p class="description"><?php esc_html_e( 'A source URL is required so the record stays traceable to where the verification method came from.', 'vcns-security-automation-manager' ); ?></p>
+			<?php if ( null !== $editing_vendor && ! empty( $editing_vendor['is_builtin'] ) ) : ?>
+			<p class="description"><?php esc_html_e( 'This is a built-in vendor -- it can be edited (for example, to add a published CIDR range once verified) but not deleted or renamed.', 'vcns-security-automation-manager' ); ?></p>
+			<?php endif; ?>
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="wp-sam-vendor-form">
+				<?php wp_nonce_field( 'wp_sam_scanner_vendor_upsert' ); ?>
 			<input type="hidden" name="action" value="wp_sam_scanner_vendor_upsert" />
 			<table class="form-table">
 				<tr>

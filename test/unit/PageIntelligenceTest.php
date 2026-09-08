@@ -117,6 +117,40 @@ class PageIntelligenceTest extends TestCase {
 		$this->assertStringNotContainsString( 'tablenav-pages', $output );
 	}
 
+	public function test_identities_default_sort_is_occurrences_descending(): void {
+		$_GET['tab']              = 'identities';
+		$GLOBALS['_wpdb_get_var'] = 45;
+		$GLOBALS['_wpdb_get_results_queue'] = array( $this->identity_rows( 20 ) );
+
+		ob_start();
+		require WP_SAM_DIR . 'includes/admin/views/page-intelligence.php';
+		$output = (string) ob_get_clean();
+
+		unset( $_GET['tab'] );
+
+		$this->assertStringContainsString( 'sort=occurrences', $output );
+		$this->assertStringContainsString( 'dir=desc', $output );
+	}
+
+	public function test_identities_loopback_row_is_auto_authorised_without_decision_buttons(): void {
+		$_GET['tab']              = 'identities';
+		$GLOBALS['_wpdb_get_var'] = 1;
+		$GLOBALS['_wpdb_get_results_queue'] = array(
+			array(
+				$this->identity_rows( 1, array( 'verification_state' => 'loopback', 'ip' => '127.0.0.1' ) )[0],
+			),
+		);
+
+		ob_start();
+		require WP_SAM_DIR . 'includes/admin/views/page-intelligence.php';
+		$output = (string) ob_get_clean();
+
+		unset( $_GET['tab'] );
+
+		$this->assertStringContainsString( 'Auto-authorised (loopback)', $output );
+		$this->assertStringNotContainsString( 'value="authorise"', $output );
+	}
+
 	// ── Vendors tab ──────────────────────────────────────────────────────────────
 
 	public function test_vendors_tab_shows_an_edit_link_for_a_builtin_vendor_but_no_delete(): void {
@@ -171,6 +205,21 @@ class PageIntelligenceTest extends TestCase {
 		$this->assertStringContainsString( 'value="Googlebot"', $output );
 		$this->assertStringContainsString( 'Seeded on activation.', $output );
 		$this->assertStringContainsString( 'Delete and re-add under a new key instead.', $output );
+		$this->assertMatchesRegularExpression( '/<details class="wp-sam-filter-form" id="wp-sam-vendor-form"[^>]* open>/', $output );
+	}
+
+	public function test_vendors_add_form_is_collapsed_by_default_when_not_editing(): void {
+		$_GET['tab']                   = 'vendors';
+		$GLOBALS['_wpdb_get_results'] = array();
+
+		ob_start();
+		require WP_SAM_DIR . 'includes/admin/views/page-intelligence.php';
+		$output = (string) ob_get_clean();
+
+		unset( $_GET['tab'] );
+
+		$this->assertStringContainsString( 'Add a vendor', $output );
+		$this->assertDoesNotMatchRegularExpression( '/<details class="wp-sam-filter-form" id="wp-sam-vendor-form"[^>]* open>/', $output );
 	}
 
 	// ── Fixtures ─────────────────────────────────────────────────────────────────
@@ -212,20 +261,26 @@ class PageIntelligenceTest extends TestCase {
 		return $rows;
 	}
 
-	/** @return array<int, array<string, mixed>> */
-	private function identity_rows( int $count ): array {
+	/**
+	 * @param array<string, mixed> $overrides Applied to every generated row.
+	 * @return array<int, array<string, mixed>>
+	 */
+	private function identity_rows( int $count, array $overrides = array() ): array {
 		$rows = array();
 		for ( $i = 1; $i <= $count; $i++ ) {
-			$rows[] = array(
-				'id'                  => $i,
-				'vendor_key'          => '',
-				'verification_state'  => 'unknown',
-				'ip'                  => "203.0.113.{$i}",
-				'surface'             => 'frontend',
-				'claimed_identity'    => '',
-				'occurrence_count'    => 1,
-				'last_seen_at'        => '2026-01-01 00:00:00',
-				'recent_paths'        => '',
+			$rows[] = array_merge(
+				array(
+					'id'                  => $i,
+					'vendor_key'          => '',
+					'verification_state'  => 'unknown',
+					'ip'                  => "203.0.113.{$i}",
+					'surface'             => 'frontend',
+					'claimed_identity'    => '',
+					'occurrence_count'    => 1,
+					'last_seen_at'        => '2026-01-01 00:00:00',
+					'recent_paths'        => '',
+				),
+				$overrides
 			);
 		}
 		return $rows;
