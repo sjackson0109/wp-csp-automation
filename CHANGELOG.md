@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows semantic versioning for plugin releases.
 
+## [2.9.88] - 2026-09-08
+
+### Added
+
+- Security posture score, evolved in place (GitHub issue #175, per the decision to extend `Security_Health` incrementally rather than build a new aggregation layer): new `Security_Health::MODEL_VERSION` constant (now `2`), shown on the Health tab, satisfying the roadmap's "version the scoring model, record changes in the changelog" requirement -- v1 was the original, unversioned 4-state/8-row model.
+- `enforcement_row()` now reports a per-surface CSP breakdown (`per_surface`: mode + `exception_active` per surface) and distinguishes a surface not enforcing because it's still learning from one not enforcing because of an active, administrator-recorded exception (`Exception_Store::has_active_for('csp_enforce', $surface)`, real since #177) -- directly satisfying "distinguish intentional exceptions from failures," previously impossible with no exceptions concept to check against.
+- `exceptions_row()` now also counts formal, time-bound exceptions (`sam_exceptions` where `review_status = 'active'`) alongside the pre-existing proxy signals (IP allow rules, permanent blocks, dependency exceptions, CSP/header overrides) -- listed alongside, not instead of, those signals, since they remain genuinely different things.
+- The full 11-state-per-control matrix from the original roadmap spec is **not** attempted in this pass -- "evolve in place" is an incremental commitment, not a one-PR completion; issue #175 stays open with this narrower scope recorded against it rather than being closed.
+
 ## [2.9.87] - 2026-09-08
 
 ### Added

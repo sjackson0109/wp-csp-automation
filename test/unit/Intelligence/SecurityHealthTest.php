@@ -44,21 +44,46 @@ class SecurityHealthTest extends TestCase {
 	}
 
 	// ── enforcement_row() ────────────────────────────────────────────────────
+	//
+	// Query order (GitHub issue #175, per-surface + exception-awareness):
+	// 1. get_results() -- every csp_policy_profiles (surface, mode) row.
+	// 2. get_var() -- traffic-control surfaces enforcing.
+	// 3. get_var() once per surface NOT already in 'enforce' mode --
+	//    Exception_Store::has_active_for('csp_enforce', $surface).
 
 	public function test_enforcement_is_info_when_nothing_is_enforcing(): void {
-		$GLOBALS['_wpdb_get_var_queue'] = array( 0, 0 );
+		$GLOBALS['_wpdb_get_results']   = array(); // No CSP rows -- all 4 surfaces default to report-only.
+		$GLOBALS['_wpdb_get_var_queue'] = array( 0, 0, 0, 0, 0 ); // traffic=0, then 4 has_active_for checks (report-only, admin, login, api all default to false).
 
 		$row = $this->invoke( 'enforcement_row' );
 
 		$this->assertSame( 'info', $row['status'] );
+		$this->assertArrayHasKey( 'per_surface', $row );
+		$this->assertCount( 4, $row['per_surface'] );
 	}
 
 	public function test_enforcement_is_pass_when_something_is_enforcing(): void {
-		$GLOBALS['_wpdb_get_var_queue'] = array( 2, 0 );
+		$GLOBALS['_wpdb_get_results']   = array( array( 'surface' => 'frontend', 'mode' => 'enforce' ) );
+		$GLOBALS['_wpdb_get_var_queue'] = array( 0, 0, 0, 0 ); // traffic=0, then 3 has_active_for checks (admin/login/api -- frontend is already enforcing, skipped).
 
 		$row = $this->invoke( 'enforcement_row' );
 
 		$this->assertSame( 'pass', $row['status'] );
+		$this->assertSame( 'enforce', $row['per_surface']['frontend']['mode'] );
+	}
+
+	public function test_enforcement_names_a_surface_exempted_by_an_active_exception(): void {
+		$GLOBALS['_wpdb_get_results']   = array(); // All 4 surfaces default to report-only.
+		// traffic=0, then has_active_for() for frontend/admin/login/api in
+		// that order -- only frontend (1) has an active exception.
+		$GLOBALS['_wpdb_get_var_queue'] = array( 0, 1, 0, 0, 0 );
+
+		$row = $this->invoke( 'enforcement_row' );
+
+		$this->assertSame( 'info', $row['status'] ); // Still not enforcing -- exemption doesn't fabricate a pass.
+		$this->assertStringContainsString( '1 exempted via an active exception', $row['value'] );
+		$this->assertTrue( $row['per_surface']['frontend']['exception_active'] );
+		$this->assertFalse( $row['per_surface']['admin']['exception_active'] );
 	}
 
 	// ── drift_row() ──────────────────────────────────────────────────────────
@@ -151,13 +176,18 @@ class SecurityHealthTest extends TestCase {
 
 	// ── exceptions_row() ─────────────────────────────────────────────────────
 
-	public function test_exceptions_sums_every_source_and_is_always_info(): void {
-		$GLOBALS['_wpdb_get_var_queue'] = array( 1, 2, 3, 4, 5 );
+	public function test_exceptions_sums_every_source_including_formal_exceptions_and_is_always_info(): void {
+		// ip_allow=1, persistent_blocks=2, dep_exceptions=3, csp_overrides=4,
+		// pillar_overrides=5, formal_exceptions=6 (GitHub issue #177's real
+		// sam_exceptions table) -- sum 21.
+		$GLOBALS['_wpdb_get_var_queue'] = array( 1, 2, 3, 4, 5, 6 );
 
 		$row = $this->invoke( 'exceptions_row' );
 
 		$this->assertSame( 'info', $row['status'] );
-		$this->assertStringContainsString( '15', $row['value'] );
+		$this->assertStringContainsString( '21', $row['value'] );
+		$this->assertStringContainsString( 'Formal exceptions', $row['detail'] );
+		$this->assertStringContainsString( '6', $row['detail'] );
 	}
 
 	// ── automation_row() ─────────────────────────────────────────────────────
@@ -201,5 +231,11 @@ class SecurityHealthTest extends TestCase {
 
 		$this->assertSame( 'info', $row['status'] );
 		$this->assertStringContainsString( 'Not available', $row['value'] );
+	}
+
+	// ── Scoring model versioning (GitHub issue #175) ────────────────────────
+
+	public function test_model_version_is_2(): void {
+		$this->assertSame( 2, Security_Health::MODEL_VERSION );
 	}
 }
