@@ -68,6 +68,40 @@ class PageIntelligenceTest extends TestCase {
 		$this->assertStringNotContainsString( 'tablenav-pages', $output );
 	}
 
+	public function test_events_family_column_shows_the_value_when_it_differs_from_the_detector(): void {
+		$_GET['tab']              = 'events';
+		$GLOBALS['_wpdb_get_var'] = 1;
+		$GLOBALS['_wpdb_get_results_queue'] = array(
+			$this->event_rows( 1, array( 'detector_id' => 'custom_3', 'detector_family' => 'custom' ) ),
+		);
+
+		ob_start();
+		require WP_SAM_DIR . 'includes/admin/views/page-intelligence.php';
+		$output = (string) ob_get_clean();
+
+		unset( $_GET['tab'] );
+
+		$this->assertStringContainsString( 'custom_3', $output );
+		$this->assertStringContainsString( 'custom', $output );
+	}
+
+	public function test_events_family_column_collapses_to_an_em_dash_when_identical_to_the_detector(): void {
+		$_GET['tab']              = 'events';
+		$GLOBALS['_wpdb_get_var'] = 1;
+		$GLOBALS['_wpdb_get_results_queue'] = array(
+			$this->event_rows( 1, array( 'detector_id' => 'header-consistency', 'detector_family' => 'header-consistency' ) ),
+		);
+
+		ob_start();
+		require WP_SAM_DIR . 'includes/admin/views/page-intelligence.php';
+		$output = (string) ob_get_clean();
+
+		unset( $_GET['tab'] );
+
+		$this->assertSame( 1, substr_count( $output, 'header-consistency' ) );
+		$this->assertStringContainsString( '—', $output );
+	}
+
 	// ── Identities tab ──────────────────────────────────────────────────────────
 
 	public function test_identities_pagination_caps_out_of_range_page(): void {
@@ -243,19 +277,25 @@ class PageIntelligenceTest extends TestCase {
 		);
 	}
 
-	/** @return array<int, array<string, mixed>> */
-	private function event_rows( int $count ): array {
+	/**
+	 * @param array<string, mixed> $overrides Applied to every generated row.
+	 * @return array<int, array<string, mixed>>
+	 */
+	private function event_rows( int $count, array $overrides = array() ): array {
 		$rows = array();
 		for ( $i = 1; $i <= $count; $i++ ) {
-			$rows[] = array(
-				'surface'          => 'frontend',
-				'detector_id'      => 'sqli_probe',
-				'detector_family'  => 'injection',
-				'severity'         => 'high',
-				'occurrence_count' => 1,
-				'first_seen_at'    => '2026-01-01 00:00:00',
-				'last_seen_at'     => '2026-01-02 00:00:00',
-				'detail'           => '',
+			$rows[] = array_merge(
+				array(
+					'surface'          => 'frontend',
+					'detector_id'      => 'sqli_probe',
+					'detector_family'  => 'injection',
+					'severity'         => 'high',
+					'occurrence_count' => 1,
+					'first_seen_at'    => '2026-01-01 00:00:00',
+					'last_seen_at'     => '2026-01-02 00:00:00',
+					'detail'           => '',
+				),
+				$overrides
 			);
 		}
 		return $rows;

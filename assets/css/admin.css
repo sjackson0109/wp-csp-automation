@@ -420,8 +420,13 @@
  * table's own 8 columns (a wrong Family/Severity/date width was the actual
  * cause of the reported "awful spacing" -- wrapping detector-family labels
  * and dates that would otherwise fit on one line). Pin every column except
- * Family, the longest and most variable label, and leave it unset to
- * absorb whatever's left.
+ * Family, left unset to absorb whatever's left: for the large majority of
+ * detectors it renders as a plain em-dash (see page-intelligence.php's own
+ * comment -- id() and family() are the same string for all but a handful
+ * of detectors), so it rarely needs the room, but the rare distinct family
+ * name (e.g. "deception", "network-intelligence") still has space to
+ * breathe. Detector is widened to comfortably fit the longest current
+ * detector id ("script-webshell-probes", 22 characters) without wrapping.
  *
  * Column order: 1 Surface, 2 Detector, 3 Family, 4 Severity,
  * 5 Occurrences, 6 First Seen, 7 Last Seen, 8 Details.
@@ -433,7 +438,7 @@
 
 .wp-sam-events-table th:nth-child(2),
 .wp-sam-events-table td:nth-child(2) {
-	width: 170px;
+	width: 200px;
 }
 
 .wp-sam-events-table th:nth-child(4),
@@ -448,12 +453,12 @@
 
 .wp-sam-events-table th:nth-child(6),
 .wp-sam-events-table td:nth-child(6) {
-	width: 145px;
+	width: 150px;
 }
 
 .wp-sam-events-table th:nth-child(7),
 .wp-sam-events-table td:nth-child(7) {
-	width: 145px;
+	width: 150px;
 }
 
 .wp-sam-events-table th:nth-child(8),
@@ -849,6 +854,73 @@ details.wp-sam-filter-form form {
 	display: block;
 	font-size: 1.05em;
 	font-weight: 600;
+}
+
+/*
+ * Baseline & Drift -- Drift table: Item and Actions are the two columns
+ * whose content has a natural, predictable size (an item key/path; a
+ * Reason input plus two small buttons), so they're pinned; Category,
+ * Risk, Correlation, Disposition, and Details are left unset to split
+ * whatever's left rather than each guessing a fixed width for text that
+ * varies a lot row to row (a one-line risk badge next to a full sentence
+ * of correlation explanation). word-break: break-word (not break-all,
+ * the site-wide default used elsewhere for `code`) lets a long item key
+ * wrap at natural boundaries -- a slash or hyphen -- instead of
+ * mid-word.
+ *
+ * Column order: 1 Category, 2 Item, 3 Risk, 4 Correlation, 5 Disposition,
+ * 6 Details, 7 Actions.
+ */
+.wp-sam-drift-table th:nth-child(2),
+.wp-sam-drift-table td:nth-child(2) {
+	width: 140px;
+}
+
+.wp-sam-drift-table th:nth-child(7),
+.wp-sam-drift-table td:nth-child(7) {
+	width: 200px;
+}
+
+.wp-sam-drift-table td {
+	white-space: normal;
+}
+
+.wp-sam-wrap .widefat .wp-sam-drift-item {
+	word-break: break-word;
+}
+
+/*
+ * Advanced Intelligence -- Campaigns table: Actions now stacks a shared
+ * Reason input above two forms (Acknowledge/Dismiss, Block Participants),
+ * so it needs real room; First / Last Detected holds two timestamps and
+ * is the one column left unset to absorb whatever's left.
+ *
+ * Column order: 1 Detector, 2 Surface, 3 Participants, 4 Status,
+ * 5 First / Last Detected, 6 Actions.
+ */
+.wp-sam-campaigns-table th:nth-child(1),
+.wp-sam-campaigns-table td:nth-child(1) {
+	width: 180px;
+}
+
+.wp-sam-campaigns-table th:nth-child(2),
+.wp-sam-campaigns-table td:nth-child(2) {
+	width: 90px;
+}
+
+.wp-sam-campaigns-table th:nth-child(3),
+.wp-sam-campaigns-table td:nth-child(3) {
+	width: 180px;
+}
+
+.wp-sam-campaigns-table th:nth-child(4),
+.wp-sam-campaigns-table td:nth-child(4) {
+	width: 100px;
+}
+
+.wp-sam-campaigns-table th:nth-child(6),
+.wp-sam-campaigns-table td:nth-child(6) {
+	width: 240px;
 }
 
 /*

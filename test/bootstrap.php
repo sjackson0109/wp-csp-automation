@@ -189,6 +189,12 @@ if ( ! function_exists( 'esc_html' ) ) {
 	}
 }
 
+if ( ! function_exists( 'esc_js' ) ) {
+	function esc_js( string $text ): string {
+		return addslashes( $text );
+	}
+}
+
 if ( ! function_exists( 'esc_textarea' ) ) {
 	function esc_textarea( string $text ): string {
 		return htmlspecialchars( $text, ENT_QUOTES, 'UTF-8' );
