@@ -32,8 +32,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 final class Campaign_Detector {
 
-	private const DEFAULT_WINDOW_HOURS     = 24;
-	private const DEFAULT_MIN_PARTICIPANTS = 10;
+	/** Public so the Campaigns admin view can state the actual criteria rather than duplicating these numbers. */
+	public const DEFAULT_WINDOW_HOURS     = 24;
+	public const DEFAULT_MIN_PARTICIPANTS = 10;
 
 	private Event_Store $events;
 	private Campaign_Store $campaigns;

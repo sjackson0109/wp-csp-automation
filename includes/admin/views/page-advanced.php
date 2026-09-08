@@ -23,10 +23,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 use WP_SAM\Admin\Change_Timeline_Builder;
 use WP_SAM\Admin\Risk_Badge;
 use WP_SAM\Intelligence\Baseline_Store;
+use WP_SAM\Intelligence\Campaign_Detector;
 use WP_SAM\Intelligence\Campaign_Store;
 use WP_SAM\Intelligence\Change_Log_Store;
 use WP_SAM\Intelligence\Change_Window_Store;
 use WP_SAM\Intelligence\Drift_Store;
+use WP_SAM\Intelligence\Event_Store;
 use WP_SAM\Intelligence\Honeypath_Store;
 
 $base_url     = admin_url( 'admin.php?page=security-automation-manager-advanced' );
@@ -80,15 +82,29 @@ $tab_help = array(
 
 	<?php if ( 'campaigns' === $tab ) : ?>
 
+		<p class="description">
+			<?php
+			printf(
+				/* translators: 1: minimum distinct-IP count, 2: detection window in hours */
+				esc_html__( 'A campaign is recorded when %1$d or more distinct IPs trigger the same detector on the same surface within a %2$d-hour window -- distributed source IPs are the one correlation signal recorded here; see the docs for what this does and does not cover.', 'vcns-security-automation-manager' ),
+				(int) Campaign_Detector::DEFAULT_MIN_PARTICIPANTS,
+				(int) Campaign_Detector::DEFAULT_WINDOW_HOURS
+			);
+			?>
+		</p>
+
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin:1em 0">
 			<?php wp_nonce_field( 'wp_sam_campaign_scan' ); ?>
 			<input type="hidden" name="action" value="wp_sam_campaign_scan" />
 			<?php submit_button( __( 'Run Campaign Scan', 'vcns-security-automation-manager' ), 'primary', '', false ); ?>
 		</form>
 
-		<?php $campaigns = ( new Campaign_Store() )->all(); ?>
+		<?php
+		$campaigns   = ( new Campaign_Store() )->all();
+		$event_store = new Event_Store();
+		?>
 
-		<table class="widefat fixed striped wp-sam-violations-table">
+		<table class="widefat fixed striped wp-sam-violations-table wp-sam-campaigns-table">
 			<thead>
 				<tr>
 					<th><?php esc_html_e( 'Detector', 'vcns-security-automation-manager' ); ?></th>
@@ -101,27 +117,69 @@ $tab_help = array(
 			</thead>
 			<tbody>
 			<?php foreach ( $campaigns as $campaign ) : ?>
+				<?php
+				$campaign_id         = (int) $campaign['id'];
+				$reason_id           = 'wp-sam-campaign-reason-' . $campaign_id;
+				$disposition_form_id = 'wp-sam-campaign-disposition-form-' . $campaign_id;
+				$block_form_id       = 'wp-sam-campaign-block-form-' . $campaign_id;
+
+				// Re-queried live, same as block_participants() itself does,
+				// rather than trusting the stored participant_count -- an
+				// administrator deciding whether to block should see the
+				// same list the block action would actually act on, not a
+				// possibly-stale count from when the row was last detected.
+				$participant_ips = $event_store->distinct_ips( (string) $campaign['detector_id'], (string) $campaign['surface'], Campaign_Detector::DEFAULT_WINDOW_HOURS );
+				$ips_shown       = array_slice( $participant_ips, 0, 100 );
+				$ips_remaining   = count( $participant_ips ) - count( $ips_shown );
+				?>
 			<tr>
 				<td><code><?php echo esc_html( (string) $campaign['detector_id'] ); ?></code></td>
 				<td><?php echo esc_html( ucfirst( (string) $campaign['surface'] ) ); ?></td>
-				<td><?php echo esc_html( (string) $campaign['participant_count'] ); ?> <?php esc_html_e( 'distinct IPs', 'vcns-security-automation-manager' ); ?></td>
+				<td>
+					<?php echo esc_html( (string) $campaign['participant_count'] ); ?> <?php esc_html_e( 'distinct IPs', 'vcns-security-automation-manager' ); ?>
+					<?php if ( ! empty( $participant_ips ) ) : ?>
+					<span class="dashicons dashicons-info-outline wp-sam-meta-icon" tabindex="0">
+						<span class="wp-sam-meta-popover" role="tooltip">
+							<div class="wp-sam-meta-row"><strong><?php esc_html_e( 'Currently live participant IPs:', 'vcns-security-automation-manager' ); ?></strong></div>
+							<div class="wp-sam-meta-row"><code><?php echo esc_html( implode( ', ', $ips_shown ) ); ?></code></div>
+							<?php if ( $ips_remaining > 0 ) : ?>
+							<div class="wp-sam-meta-row">
+								<?php
+								echo esc_html(
+									sprintf(
+										/* translators: %d: number of additional participant IPs not shown */
+										_n( '+%d more not shown here.', '+%d more not shown here.', $ips_remaining, 'vcns-security-automation-manager' ),
+										$ips_remaining
+									)
+								);
+								?>
+							</div>
+							<?php endif; ?>
+						</span>
+					</span>
+					<?php else : ?>
+					<span class="dashicons dashicons-info-outline wp-sam-meta-icon wp-sam-meta-icon--empty" title="<?php esc_attr_e( 'No participant is still active within the detection window -- the stored count reflects when this campaign was last detected.', 'vcns-security-automation-manager' ); ?>"></span>
+					<?php endif; ?>
+				</td>
 				<td><?php echo esc_html( ucfirst( (string) $campaign['status'] ) ); ?></td>
 				<td><?php echo esc_html( (string) $campaign['first_detected_at'] . ' / ' . (string) $campaign['last_detected_at'] ); ?></td>
 				<td>
 					<?php if ( 'detected' === (string) $campaign['status'] ) : ?>
-					<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+					<input type="text" id="<?php echo esc_attr( $reason_id ); ?>" class="wp-sam-campaign-reason" data-campaign-forms="<?php echo esc_attr( $disposition_form_id . ' ' . $block_form_id ); ?>" placeholder="<?php esc_attr_e( 'Reason', 'vcns-security-automation-manager' ); ?>" aria-required="true" style="width:160px" />
+					<br />
+					<form id="<?php echo esc_attr( $disposition_form_id ); ?>" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="wp-sam-campaign-form" style="display:inline-block;margin-top:4px">
 						<?php wp_nonce_field( 'wp_sam_campaign_disposition' ); ?>
 						<input type="hidden" name="action" value="wp_sam_campaign_disposition" />
-						<input type="hidden" name="campaign_id" value="<?php echo esc_attr( (string) $campaign['id'] ); ?>" />
-						<input type="text" name="note" placeholder="<?php esc_attr_e( 'Reason', 'vcns-security-automation-manager' ); ?>" required style="width:110px" />
+						<input type="hidden" name="campaign_id" value="<?php echo esc_attr( (string) $campaign_id ); ?>" />
+						<input type="hidden" name="note" class="wp-sam-campaign-note-target" />
 						<button type="submit" name="disposition" value="acknowledged" class="button button-small"><?php esc_html_e( 'Acknowledge', 'vcns-security-automation-manager' ); ?></button>
 						<button type="submit" name="disposition" value="dismissed" class="button button-small"><?php esc_html_e( 'Dismiss', 'vcns-security-automation-manager' ); ?></button>
 					</form>
-					<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin-top:4px">
+					<form id="<?php echo esc_attr( $block_form_id ); ?>" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="wp-sam-campaign-form" style="display:inline-block;margin-top:4px">
 						<?php wp_nonce_field( 'wp_sam_campaign_block' ); ?>
 						<input type="hidden" name="action" value="wp_sam_campaign_block" />
-						<input type="hidden" name="campaign_id" value="<?php echo esc_attr( (string) $campaign['id'] ); ?>" />
-						<input type="text" name="note" placeholder="<?php esc_attr_e( 'Reason (required)', 'vcns-security-automation-manager' ); ?>" required style="width:110px" />
+						<input type="hidden" name="campaign_id" value="<?php echo esc_attr( (string) $campaign_id ); ?>" />
+						<input type="hidden" name="note" class="wp-sam-campaign-note-target" />
 						<button type="submit" class="button button-primary button-small" onclick="return confirm('<?php echo esc_js( __( 'Block every currently-live participant IP? This is an explicit, immediate action.', 'vcns-security-automation-manager' ) ); ?>');"><?php esc_html_e( 'Block Participants', 'vcns-security-automation-manager' ); ?></button>
 					</form>
 					<?php else : ?>

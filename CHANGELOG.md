@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows semantic versioning for plugin releases.
 
+## [2.9.92] - 2026-09-09
+
+### Fixed
+
+- Baseline & Drift's Drift table (`page-baseline.php`): new `wp-sam-drift-table` CSS class pins Item to 140px and Actions to 200px, leaving Category/Risk/Correlation/Disposition/Details to split the remaining width dynamically instead of inheriting the generic Violations-table defaults. `.wp-sam-drift-item` overrides the site-wide `code { word-break: break-all }` rule with `break-word` so a long item key (a path, a plugin file) wraps at a slash or hyphen instead of mid-word.
+- Advanced Intelligence's Campaigns tab (`page-advanced.php`): consolidated the duplicate Reason input (previously one per form) into a single shared field, mirrored into each form's hidden `note` input on submit via a small addition to `admin.js` -- the two existing admin-post handlers (`wp_sam_campaign_disposition`, `wp_sam_campaign_block`) are unchanged. Added an info-icon popover (matching the existing `wp-sam-meta-icon` pattern) showing the actual currently-live participant IPs, re-queried the same way `block_participants()` itself does rather than trusting the row's stored count. Added explanatory copy stating the real detection criteria, now read from `Campaign_Detector::DEFAULT_MIN_PARTICIPANTS`/`DEFAULT_WINDOW_HOURS` (widened from `private` to `public` so the view isn't duplicating the numbers) instead of leaving an administrator to guess what "many distinct sources" actually means.
+- Continuous Intelligence's Events table (`page-intelligence.php`): the Family column repeats the exact same string as the Detector column for every built-in detector except three (`Custom_Rule_Detector`, `Honeypath_Detector`, `Tor_Exit_Detector`, confirmed by reading every detector's `id()`/`family()` pair) -- it's now collapsed to an em-dash whenever the two are identical, and the Detector column widened to 200px to comfortably fit the longest current detector id without wrapping.
+- Added an `esc_js()` stub to `test/bootstrap.php` -- a pre-existing gap never caught before because no test previously rendered `page-advanced.php` at all. New `test/unit/PageBaselineTest.php` and `test/unit/PageAdvancedTest.php` close that same gap for the Drift and Campaigns tabs respectively.
+
 ## [2.9.91] - 2026-09-08
 
 ### Fixed

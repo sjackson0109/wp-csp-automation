@@ -252,7 +252,20 @@ $tab_help = array(
 			<tr>
 				<td><?php echo esc_html( ucfirst( (string) $event['surface'] ) ); ?></td>
 				<td><code><?php echo esc_html( (string) $event['detector_id'] ); ?></code></td>
-				<td><?php echo esc_html( (string) $event['detector_family'] ); ?></td>
+				<td>
+					<?php
+					// Most built-in detectors return the same string from id()
+					// and family() -- family only actually groups something
+					// distinct for the handful that group multiple ids under
+					// one family (custom rules all share 'custom'; Honeypath
+					// reports its family as 'deception'; Tor_Exit_Detector as
+					// 'network-intelligence'). Repeating an identical string
+					// in both columns for every other row is pure duplication
+					// with nothing left to show, so it's collapsed to an
+					// em-dash rather than restated.
+					echo esc_html( (string) $event['detector_family'] !== (string) $event['detector_id'] ? (string) $event['detector_family'] : '—' );
+					?>
+				</td>
 				<td><?php echo esc_html( ucfirst( (string) $event['severity'] ) ); ?></td>
 				<td><?php echo esc_html( number_format( (int) $event['occurrence_count'] ) ); ?></td>
 				<td><?php echo esc_html( (string) $event['first_seen_at'] ); ?></td>

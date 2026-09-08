@@ -4,7 +4,7 @@ Tags: security, csp, content security policy, hsts, ssl certificates
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 2.9.91
+Stable tag: 2.9.92
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -114,6 +114,12 @@ The remaining three DNS-01 drivers (acme-dns, PowerDNS, and RFC 2136 dynamic DNS
 When an administrator configures automatic cPanel deployment, once a certificate is successfully issued the plugin sends an HTTPS request to the cPanel host the administrator specifies (cPanel's UAPI SSL::install_ssl endpoint), containing: the cPanel account username and API token supplied by the administrator (as an Authorization header); the domain name; the issued certificate; the certificate chain; and the certificate's private key. This is the one automatic-deployment method that transmits the private key itself, since installing a certificate requires it. Nothing is sent unless cPanel deployment is explicitly configured, and it happens once per issuance or renewal, immediately after the certificate is issued. Because the endpoint is the administrator's own hosting provider, not a service this plugin operates or has a relationship with, no single Terms of Service or Privacy Policy governs it -- those are whatever the administrator's own hosting provider publishes for their account and API access.
 
 == Changelog ==
+
+= 2.9.92 =
+
+* Fixed: Baseline & Drift's Drift table had unsuitable column widths for its content -- Item and Actions are now pinned (140px/200px) and the rest size dynamically, with long item keys now wrapping at natural word boundaries instead of overflowing.
+* Fixed: Advanced Intelligence's Campaigns tab asked for a reason twice (one box for Acknowledge/Dismiss, a second for Block Participants) -- now a single Reason field feeds whichever action you take. Added an info icon showing the actual currently-live participant IPs, and explanatory text stating the real detection criteria (10+ distinct IPs on the same detector/surface within 24 hours) so a block decision isn't made blind.
+* Fixed: Continuous Intelligence's Events table still wrapped text unnecessarily in narrow viewports; widened the Detector column and collapsed the Family column to an em-dash whenever it's identical to the Detector (the case for the large majority of built-in detectors), which is what was crowding the table in the first place.
 
 = 2.9.91 =
 
