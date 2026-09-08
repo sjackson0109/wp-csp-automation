@@ -345,27 +345,25 @@ $tab_help = array(
 
 			<?php $tor_store = new Tor_Exit_List_Store(); ?>
 
-			<table class="widefat fixed striped wp-sam-violations-table" style="margin-top:1em">
-				<tbody>
-					<tr>
-						<th style="width:200px"><?php esc_html_e( 'Known exit nodes', 'vcns-security-automation-manager' ); ?></th>
-						<td><?php echo esc_html( number_format( $tor_store->count() ) ); ?></td>
-					</tr>
-					<tr>
-						<th><?php esc_html_e( 'Last refreshed', 'vcns-security-automation-manager' ); ?></th>
-						<td><?php echo esc_html( $tor_store->last_refreshed_at() ?? __( 'Never', 'vcns-security-automation-manager' ) ); ?></td>
-					</tr>
-					<tr>
-						<th><?php esc_html_e( 'Last fetch status', 'vcns-security-automation-manager' ); ?></th>
-						<td>
-							<?php
-							$status = $tor_store->last_fetch_status();
-							echo esc_html( '' !== $status ? ucfirst( $status ) : __( 'Not yet run', 'vcns-security-automation-manager' ) );
-							?>
-						</td>
-					</tr>
-				</tbody>
-			</table>
+			<div class="wp-sam-stat-row">
+				<div class="wp-sam-stat">
+					<span class="wp-sam-stat-label"><?php esc_html_e( 'Known exit nodes', 'vcns-security-automation-manager' ); ?></span>
+					<span class="wp-sam-stat-value"><?php echo esc_html( number_format( $tor_store->count() ) ); ?></span>
+				</div>
+				<div class="wp-sam-stat">
+					<span class="wp-sam-stat-label"><?php esc_html_e( 'Last refreshed', 'vcns-security-automation-manager' ); ?></span>
+					<span class="wp-sam-stat-value"><?php echo esc_html( $tor_store->last_refreshed_at() ?? __( 'Never', 'vcns-security-automation-manager' ) ); ?></span>
+				</div>
+				<div class="wp-sam-stat">
+					<span class="wp-sam-stat-label"><?php esc_html_e( 'Last fetch status', 'vcns-security-automation-manager' ); ?></span>
+					<span class="wp-sam-stat-value">
+						<?php
+						$status = $tor_store->last_fetch_status();
+						echo esc_html( '' !== $status ? ucfirst( $status ) : __( 'Not yet run', 'vcns-security-automation-manager' ) );
+						?>
+					</span>
+				</div>
+			</div>
 
 			<p class="description" style="margin-top:1em">
 				<?php esc_html_e( 'Refreshed automatically once a day from the Tor Project\'s own public exit-node list. Tor identity is recorded as context on evidence a detector already produced -- it never implies malicious intent on its own, and nothing here blocks a visitor.', 'vcns-security-automation-manager' ); ?>
@@ -397,22 +395,20 @@ $tab_help = array(
 			if ( '' !== $lookup_ip ) :
 				$lookup_result = ( new Asn_Lookup_Store() )->resolve( $lookup_ip );
 				?>
-			<table class="widefat fixed striped wp-sam-violations-table" style="margin-top:1em">
-				<tbody>
-					<tr>
-						<th style="width:200px"><?php esc_html_e( 'IP', 'vcns-security-automation-manager' ); ?></th>
-						<td><code><?php echo esc_html( $lookup_ip ); ?></code></td>
-					</tr>
-					<tr>
-						<th><?php esc_html_e( 'ASN', 'vcns-security-automation-manager' ); ?></th>
-						<td><?php echo esc_html( null !== $lookup_result['asn'] ? 'AS' . (string) $lookup_result['asn'] : __( 'Not found', 'vcns-security-automation-manager' ) ); ?></td>
-					</tr>
-					<tr>
-						<th><?php esc_html_e( 'Organisation', 'vcns-security-automation-manager' ); ?></th>
-						<td><?php echo esc_html( $lookup_result['asn_org'] ?? '—' ); ?></td>
-					</tr>
-				</tbody>
-			</table>
+			<div class="wp-sam-stat-row">
+				<div class="wp-sam-stat">
+					<span class="wp-sam-stat-label"><?php esc_html_e( 'IP', 'vcns-security-automation-manager' ); ?></span>
+					<span class="wp-sam-stat-value"><code><?php echo esc_html( $lookup_ip ); ?></code></span>
+				</div>
+				<div class="wp-sam-stat">
+					<span class="wp-sam-stat-label"><?php esc_html_e( 'ASN', 'vcns-security-automation-manager' ); ?></span>
+					<span class="wp-sam-stat-value"><?php echo esc_html( null !== $lookup_result['asn'] ? 'AS' . (string) $lookup_result['asn'] : __( 'Not found', 'vcns-security-automation-manager' ) ); ?></span>
+				</div>
+				<div class="wp-sam-stat">
+					<span class="wp-sam-stat-label"><?php esc_html_e( 'Organisation', 'vcns-security-automation-manager' ); ?></span>
+					<span class="wp-sam-stat-value"><?php echo esc_html( $lookup_result['asn_org'] ?? '—' ); ?></span>
+				</div>
+			</div>
 			<?php endif; ?>
 
 		<?php elseif ( 'geoip' === $ni_subtab ) : ?>
@@ -432,14 +428,12 @@ $tab_help = array(
 			</div>
 			<?php endif; ?>
 
-			<table class="widefat fixed striped wp-sam-violations-table" style="margin-top:1em;max-width:600px">
-				<tbody>
-					<tr>
-						<th style="width:200px"><?php esc_html_e( 'Status', 'vcns-security-automation-manager' ); ?></th>
-						<td><?php echo esc_html( $geo_store->is_configured() ? __( 'Enabled', 'vcns-security-automation-manager' ) : __( 'Disabled -- no token configured', 'vcns-security-automation-manager' ) ); ?></td>
-					</tr>
-				</tbody>
-			</table>
+			<div class="wp-sam-stat-row">
+				<div class="wp-sam-stat">
+					<span class="wp-sam-stat-label"><?php esc_html_e( 'Status', 'vcns-security-automation-manager' ); ?></span>
+					<span class="wp-sam-stat-value"><?php echo esc_html( $geo_store->is_configured() ? __( 'Enabled', 'vcns-security-automation-manager' ) : __( 'Disabled -- no token configured', 'vcns-security-automation-manager' ) ); ?></span>
+				</div>
+			</div>
 
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin-top:1em">
 				<?php wp_nonce_field( 'wp_sam_geoip_save_token' ); ?>
@@ -470,26 +464,24 @@ $tab_help = array(
 				if ( '' !== $geo_lookup_ip ) :
 					$geo_result = $geo_store->resolve( $geo_lookup_ip );
 					?>
-			<table class="widefat fixed striped wp-sam-violations-table" style="margin-top:1em;max-width:600px">
-				<tbody>
-					<tr>
-						<th style="width:200px"><?php esc_html_e( 'IP', 'vcns-security-automation-manager' ); ?></th>
-						<td><code><?php echo esc_html( $geo_lookup_ip ); ?></code></td>
-					</tr>
-					<tr>
-						<th><?php esc_html_e( 'Country', 'vcns-security-automation-manager' ); ?></th>
-						<td><?php echo esc_html( $geo_result['country'] ?? __( 'Not found', 'vcns-security-automation-manager' ) ); ?></td>
-					</tr>
-					<tr>
-						<th><?php esc_html_e( 'Region', 'vcns-security-automation-manager' ); ?></th>
-						<td><?php echo esc_html( $geo_result['region'] ?? '—' ); ?></td>
-					</tr>
-					<tr>
-						<th><?php esc_html_e( 'City', 'vcns-security-automation-manager' ); ?></th>
-						<td><?php echo esc_html( $geo_result['city'] ?? '—' ); ?></td>
-					</tr>
-				</tbody>
-			</table>
+			<div class="wp-sam-stat-row">
+				<div class="wp-sam-stat">
+					<span class="wp-sam-stat-label"><?php esc_html_e( 'IP', 'vcns-security-automation-manager' ); ?></span>
+					<span class="wp-sam-stat-value"><code><?php echo esc_html( $geo_lookup_ip ); ?></code></span>
+				</div>
+				<div class="wp-sam-stat">
+					<span class="wp-sam-stat-label"><?php esc_html_e( 'Country', 'vcns-security-automation-manager' ); ?></span>
+					<span class="wp-sam-stat-value"><?php echo esc_html( $geo_result['country'] ?? __( 'Not found', 'vcns-security-automation-manager' ) ); ?></span>
+				</div>
+				<div class="wp-sam-stat">
+					<span class="wp-sam-stat-label"><?php esc_html_e( 'Region', 'vcns-security-automation-manager' ); ?></span>
+					<span class="wp-sam-stat-value"><?php echo esc_html( $geo_result['region'] ?? '—' ); ?></span>
+				</div>
+				<div class="wp-sam-stat">
+					<span class="wp-sam-stat-label"><?php esc_html_e( 'City', 'vcns-security-automation-manager' ); ?></span>
+					<span class="wp-sam-stat-value"><?php echo esc_html( $geo_result['city'] ?? '—' ); ?></span>
+				</div>
+			</div>
 				<?php endif; ?>
 			<?php endif; ?>
 
@@ -557,27 +549,25 @@ $tab_help = array(
 			<?php $robots_rules_store = new Robots_Rules_Store(); ?>
 
 			<h2><?php esc_html_e( 'Robots.txt', 'vcns-security-automation-manager' ); ?></h2>
-			<table class="widefat fixed striped wp-sam-violations-table" style="margin-top:1em">
-				<tbody>
-					<tr>
-						<th style="width:200px"><?php esc_html_e( 'Cached disallow rules', 'vcns-security-automation-manager' ); ?></th>
-						<td><?php echo esc_html( number_format( count( $robots_rules_store->rules() ) ) ); ?></td>
-					</tr>
-					<tr>
-						<th><?php esc_html_e( 'Last refreshed', 'vcns-security-automation-manager' ); ?></th>
-						<td><?php echo esc_html( $robots_rules_store->last_refreshed_at() ?? __( 'Never', 'vcns-security-automation-manager' ) ); ?></td>
-					</tr>
-					<tr>
-						<th><?php esc_html_e( 'Last fetch status', 'vcns-security-automation-manager' ); ?></th>
-						<td>
-							<?php
-							$robots_status = $robots_rules_store->last_fetch_status();
-							echo esc_html( '' !== $robots_status ? ucfirst( $robots_status ) : __( 'Not yet run', 'vcns-security-automation-manager' ) );
-							?>
-						</td>
-					</tr>
-				</tbody>
-			</table>
+			<div class="wp-sam-stat-row">
+				<div class="wp-sam-stat">
+					<span class="wp-sam-stat-label"><?php esc_html_e( 'Cached disallow rules', 'vcns-security-automation-manager' ); ?></span>
+					<span class="wp-sam-stat-value"><?php echo esc_html( number_format( count( $robots_rules_store->rules() ) ) ); ?></span>
+				</div>
+				<div class="wp-sam-stat">
+					<span class="wp-sam-stat-label"><?php esc_html_e( 'Last refreshed', 'vcns-security-automation-manager' ); ?></span>
+					<span class="wp-sam-stat-value"><?php echo esc_html( $robots_rules_store->last_refreshed_at() ?? __( 'Never', 'vcns-security-automation-manager' ) ); ?></span>
+				</div>
+				<div class="wp-sam-stat">
+					<span class="wp-sam-stat-label"><?php esc_html_e( 'Last fetch status', 'vcns-security-automation-manager' ); ?></span>
+					<span class="wp-sam-stat-value">
+						<?php
+						$robots_status = $robots_rules_store->last_fetch_status();
+						echo esc_html( '' !== $robots_status ? ucfirst( $robots_status ) : __( 'Not yet run', 'vcns-security-automation-manager' ) );
+						?>
+					</span>
+				</div>
+			</div>
 
 			<p class="description" style="margin-top:1em">
 				<?php esc_html_e( 'Refreshed automatically once a day from this site\'s own /robots.txt, fetched the same way a real crawler would. Used only to check whether a source already recognised as a known crawler/scanner vendor is requesting a path this site disallows -- an ordinary visitor is never evaluated against these rules.', 'vcns-security-automation-manager' ); ?>
@@ -592,27 +582,25 @@ $tab_help = array(
 			<?php $agents_rules_store = new Agents_Rules_Store(); ?>
 
 			<h2 style="margin-top:2em"><?php esc_html_e( 'Agents.txt', 'vcns-security-automation-manager' ); ?></h2>
-			<table class="widefat fixed striped wp-sam-violations-table" style="margin-top:1em">
-				<tbody>
-					<tr>
-						<th style="width:200px"><?php esc_html_e( 'Cached disallow rules', 'vcns-security-automation-manager' ); ?></th>
-						<td><?php echo esc_html( number_format( count( $agents_rules_store->rules() ) ) ); ?></td>
-					</tr>
-					<tr>
-						<th><?php esc_html_e( 'Last refreshed', 'vcns-security-automation-manager' ); ?></th>
-						<td><?php echo esc_html( $agents_rules_store->last_refreshed_at() ?? __( 'Never', 'vcns-security-automation-manager' ) ); ?></td>
-					</tr>
-					<tr>
-						<th><?php esc_html_e( 'Last fetch status', 'vcns-security-automation-manager' ); ?></th>
-						<td>
-							<?php
-							$agents_status = $agents_rules_store->last_fetch_status();
-							echo esc_html( '' !== $agents_status ? ucfirst( $agents_status ) : __( 'Not yet run', 'vcns-security-automation-manager' ) );
-							?>
-						</td>
-					</tr>
-				</tbody>
-			</table>
+			<div class="wp-sam-stat-row">
+				<div class="wp-sam-stat">
+					<span class="wp-sam-stat-label"><?php esc_html_e( 'Cached disallow rules', 'vcns-security-automation-manager' ); ?></span>
+					<span class="wp-sam-stat-value"><?php echo esc_html( number_format( count( $agents_rules_store->rules() ) ) ); ?></span>
+				</div>
+				<div class="wp-sam-stat">
+					<span class="wp-sam-stat-label"><?php esc_html_e( 'Last refreshed', 'vcns-security-automation-manager' ); ?></span>
+					<span class="wp-sam-stat-value"><?php echo esc_html( $agents_rules_store->last_refreshed_at() ?? __( 'Never', 'vcns-security-automation-manager' ) ); ?></span>
+				</div>
+				<div class="wp-sam-stat">
+					<span class="wp-sam-stat-label"><?php esc_html_e( 'Last fetch status', 'vcns-security-automation-manager' ); ?></span>
+					<span class="wp-sam-stat-value">
+						<?php
+						$agents_status = $agents_rules_store->last_fetch_status();
+						echo esc_html( '' !== $agents_status ? ucfirst( $agents_status ) : __( 'Not yet run', 'vcns-security-automation-manager' ) );
+						?>
+					</span>
+				</div>
+			</div>
 
 			<p class="description" style="margin-top:1em">
 				<?php esc_html_e( 'agents.txt is an emerging convention some AI crawlers support for scoping what an AI agent may access, using the same syntax as robots.txt. Refreshed automatically once a day; used the same way robots.txt rules are, only against a source already recognised as a known crawler/scanner vendor.', 'vcns-security-automation-manager' ); ?>
@@ -627,43 +615,41 @@ $tab_help = array(
 			<?php $security_txt_store = new Security_Txt_Store(); ?>
 
 			<h2 style="margin-top:2em"><?php esc_html_e( 'Security.txt', 'vcns-security-automation-manager' ); ?></h2>
-			<table class="widefat fixed striped wp-sam-violations-table" style="margin-top:1em">
-				<tbody>
-					<tr>
-						<th style="width:200px"><?php esc_html_e( 'Present', 'vcns-security-automation-manager' ); ?></th>
-						<td><?php echo esc_html( $security_txt_store->is_present() ? __( 'Yes', 'vcns-security-automation-manager' ) : __( 'No', 'vcns-security-automation-manager' ) ); ?></td>
-					</tr>
-					<tr>
-						<th><?php esc_html_e( 'Expires', 'vcns-security-automation-manager' ); ?></th>
-						<td>
-							<?php
-							$security_txt_expires = $security_txt_store->fields()['Expires'][0] ?? null;
-							if ( null === $security_txt_expires ) {
-								echo esc_html( '—' );
-							} else {
-								echo esc_html( $security_txt_expires );
-								if ( $security_txt_store->is_expired() ) {
-									echo ' <strong style="color:#a94442">' . esc_html__( '(expired)', 'vcns-security-automation-manager' ) . '</strong>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- esc_html__() already escapes; the surrounding markup is a static literal.
-								}
+			<div class="wp-sam-stat-row">
+				<div class="wp-sam-stat">
+					<span class="wp-sam-stat-label"><?php esc_html_e( 'Present', 'vcns-security-automation-manager' ); ?></span>
+					<span class="wp-sam-stat-value"><?php echo esc_html( $security_txt_store->is_present() ? __( 'Yes', 'vcns-security-automation-manager' ) : __( 'No', 'vcns-security-automation-manager' ) ); ?></span>
+				</div>
+				<div class="wp-sam-stat">
+					<span class="wp-sam-stat-label"><?php esc_html_e( 'Expires', 'vcns-security-automation-manager' ); ?></span>
+					<span class="wp-sam-stat-value">
+						<?php
+						$security_txt_expires = $security_txt_store->fields()['Expires'][0] ?? null;
+						if ( null === $security_txt_expires ) {
+							echo esc_html( '—' );
+						} else {
+							echo esc_html( $security_txt_expires );
+							if ( $security_txt_store->is_expired() ) {
+								echo ' <strong style="color:#a94442">' . esc_html__( '(expired)', 'vcns-security-automation-manager' ) . '</strong>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- esc_html__() already escapes; the surrounding markup is a static literal.
 							}
-							?>
-						</td>
-					</tr>
-					<tr>
-						<th><?php esc_html_e( 'Last refreshed', 'vcns-security-automation-manager' ); ?></th>
-						<td><?php echo esc_html( $security_txt_store->last_refreshed_at() ?? __( 'Never', 'vcns-security-automation-manager' ) ); ?></td>
-					</tr>
-					<tr>
-						<th><?php esc_html_e( 'Last fetch status', 'vcns-security-automation-manager' ); ?></th>
-						<td>
-							<?php
-							$security_txt_status = $security_txt_store->last_fetch_status();
-							echo esc_html( '' !== $security_txt_status ? ucfirst( $security_txt_status ) : __( 'Not yet run', 'vcns-security-automation-manager' ) );
-							?>
-						</td>
-					</tr>
-				</tbody>
-			</table>
+						}
+						?>
+					</span>
+				</div>
+				<div class="wp-sam-stat">
+					<span class="wp-sam-stat-label"><?php esc_html_e( 'Last refreshed', 'vcns-security-automation-manager' ); ?></span>
+					<span class="wp-sam-stat-value"><?php echo esc_html( $security_txt_store->last_refreshed_at() ?? __( 'Never', 'vcns-security-automation-manager' ) ); ?></span>
+				</div>
+				<div class="wp-sam-stat">
+					<span class="wp-sam-stat-label"><?php esc_html_e( 'Last fetch status', 'vcns-security-automation-manager' ); ?></span>
+					<span class="wp-sam-stat-value">
+						<?php
+						$security_txt_status = $security_txt_store->last_fetch_status();
+						echo esc_html( '' !== $security_txt_status ? ucfirst( $security_txt_status ) : __( 'Not yet run', 'vcns-security-automation-manager' ) );
+						?>
+					</span>
+				</div>
+			</div>
 
 			<p class="description" style="margin-top:1em">
 				<?php esc_html_e( 'Refreshed automatically once a day from this site\'s own /.well-known/security.txt (falling back to the legacy /security.txt location). Recorded for visibility only -- an expired file is a hygiene signal worth acting on, but nothing here evaluates or blocks a visitor.', 'vcns-security-automation-manager' ); ?>
@@ -678,27 +664,25 @@ $tab_help = array(
 			<?php $humans_txt_store = new Humans_Txt_Store(); ?>
 
 			<h2 style="margin-top:2em"><?php esc_html_e( 'Humans.txt', 'vcns-security-automation-manager' ); ?></h2>
-			<table class="widefat fixed striped wp-sam-violations-table" style="margin-top:1em">
-				<tbody>
-					<tr>
-						<th style="width:200px"><?php esc_html_e( 'Present', 'vcns-security-automation-manager' ); ?></th>
-						<td><?php echo esc_html( $humans_txt_store->is_present() ? __( 'Yes', 'vcns-security-automation-manager' ) : __( 'No', 'vcns-security-automation-manager' ) ); ?></td>
-					</tr>
-					<tr>
-						<th><?php esc_html_e( 'Last refreshed', 'vcns-security-automation-manager' ); ?></th>
-						<td><?php echo esc_html( $humans_txt_store->last_refreshed_at() ?? __( 'Never', 'vcns-security-automation-manager' ) ); ?></td>
-					</tr>
-					<tr>
-						<th><?php esc_html_e( 'Last fetch status', 'vcns-security-automation-manager' ); ?></th>
-						<td>
-							<?php
-							$humans_txt_status = $humans_txt_store->last_fetch_status();
-							echo esc_html( '' !== $humans_txt_status ? ucfirst( $humans_txt_status ) : __( 'Not yet run', 'vcns-security-automation-manager' ) );
-							?>
-						</td>
-					</tr>
-				</tbody>
-			</table>
+			<div class="wp-sam-stat-row">
+				<div class="wp-sam-stat">
+					<span class="wp-sam-stat-label"><?php esc_html_e( 'Present', 'vcns-security-automation-manager' ); ?></span>
+					<span class="wp-sam-stat-value"><?php echo esc_html( $humans_txt_store->is_present() ? __( 'Yes', 'vcns-security-automation-manager' ) : __( 'No', 'vcns-security-automation-manager' ) ); ?></span>
+				</div>
+				<div class="wp-sam-stat">
+					<span class="wp-sam-stat-label"><?php esc_html_e( 'Last refreshed', 'vcns-security-automation-manager' ); ?></span>
+					<span class="wp-sam-stat-value"><?php echo esc_html( $humans_txt_store->last_refreshed_at() ?? __( 'Never', 'vcns-security-automation-manager' ) ); ?></span>
+				</div>
+				<div class="wp-sam-stat">
+					<span class="wp-sam-stat-label"><?php esc_html_e( 'Last fetch status', 'vcns-security-automation-manager' ); ?></span>
+					<span class="wp-sam-stat-value">
+						<?php
+						$humans_txt_status = $humans_txt_store->last_fetch_status();
+						echo esc_html( '' !== $humans_txt_status ? ucfirst( $humans_txt_status ) : __( 'Not yet run', 'vcns-security-automation-manager' ) );
+						?>
+					</span>
+				</div>
+			</div>
 
 			<p class="description" style="margin-top:1em">
 				<?php esc_html_e( 'An informal credits/colophon convention with no rules of its own -- recorded only for the same presence/last-fetch visibility every well-known file here gets, so a source examining it is correlatable against its other activity.', 'vcns-security-automation-manager' ); ?>
@@ -713,27 +697,25 @@ $tab_help = array(
 			<?php $ads_txt_store = new Ads_Txt_Store(); ?>
 
 			<h2 style="margin-top:2em"><?php esc_html_e( 'Ads.txt', 'vcns-security-automation-manager' ); ?></h2>
-			<table class="widefat fixed striped wp-sam-violations-table" style="margin-top:1em">
-				<tbody>
-					<tr>
-						<th style="width:200px"><?php esc_html_e( 'Authorised-seller records', 'vcns-security-automation-manager' ); ?></th>
-						<td><?php echo esc_html( number_format( count( $ads_txt_store->records() ) ) ); ?></td>
-					</tr>
-					<tr>
-						<th><?php esc_html_e( 'Last refreshed', 'vcns-security-automation-manager' ); ?></th>
-						<td><?php echo esc_html( $ads_txt_store->last_refreshed_at() ?? __( 'Never', 'vcns-security-automation-manager' ) ); ?></td>
-					</tr>
-					<tr>
-						<th><?php esc_html_e( 'Last fetch status', 'vcns-security-automation-manager' ); ?></th>
-						<td>
-							<?php
-							$ads_txt_status = $ads_txt_store->last_fetch_status();
-							echo esc_html( '' !== $ads_txt_status ? ucfirst( $ads_txt_status ) : __( 'Not yet run', 'vcns-security-automation-manager' ) );
-							?>
-						</td>
-					</tr>
-				</tbody>
-			</table>
+			<div class="wp-sam-stat-row">
+				<div class="wp-sam-stat">
+					<span class="wp-sam-stat-label"><?php esc_html_e( 'Authorised-seller records', 'vcns-security-automation-manager' ); ?></span>
+					<span class="wp-sam-stat-value"><?php echo esc_html( number_format( count( $ads_txt_store->records() ) ) ); ?></span>
+				</div>
+				<div class="wp-sam-stat">
+					<span class="wp-sam-stat-label"><?php esc_html_e( 'Last refreshed', 'vcns-security-automation-manager' ); ?></span>
+					<span class="wp-sam-stat-value"><?php echo esc_html( $ads_txt_store->last_refreshed_at() ?? __( 'Never', 'vcns-security-automation-manager' ) ); ?></span>
+				</div>
+				<div class="wp-sam-stat">
+					<span class="wp-sam-stat-label"><?php esc_html_e( 'Last fetch status', 'vcns-security-automation-manager' ); ?></span>
+					<span class="wp-sam-stat-value">
+						<?php
+						$ads_txt_status = $ads_txt_store->last_fetch_status();
+						echo esc_html( '' !== $ads_txt_status ? ucfirst( $ads_txt_status ) : __( 'Not yet run', 'vcns-security-automation-manager' ) );
+						?>
+					</span>
+				</div>
+			</div>
 
 			<p class="description" style="margin-top:1em">
 				<?php esc_html_e( 'Refreshed automatically once a day. A sudden drop in record count or a fetch failure can indicate unauthorised tampering (a known ad-fraud vector) as easily as a legitimate change -- worth a look either way.', 'vcns-security-automation-manager' ); ?>
@@ -748,27 +730,25 @@ $tab_help = array(
 			<?php $app_ads_txt_store = new App_Ads_Txt_Store(); ?>
 
 			<h2 style="margin-top:2em"><?php esc_html_e( 'App-Ads.txt', 'vcns-security-automation-manager' ); ?></h2>
-			<table class="widefat fixed striped wp-sam-violations-table" style="margin-top:1em">
-				<tbody>
-					<tr>
-						<th style="width:200px"><?php esc_html_e( 'Authorised-seller records', 'vcns-security-automation-manager' ); ?></th>
-						<td><?php echo esc_html( number_format( count( $app_ads_txt_store->records() ) ) ); ?></td>
-					</tr>
-					<tr>
-						<th><?php esc_html_e( 'Last refreshed', 'vcns-security-automation-manager' ); ?></th>
-						<td><?php echo esc_html( $app_ads_txt_store->last_refreshed_at() ?? __( 'Never', 'vcns-security-automation-manager' ) ); ?></td>
-					</tr>
-					<tr>
-						<th><?php esc_html_e( 'Last fetch status', 'vcns-security-automation-manager' ); ?></th>
-						<td>
-							<?php
-							$app_ads_txt_status = $app_ads_txt_store->last_fetch_status();
-							echo esc_html( '' !== $app_ads_txt_status ? ucfirst( $app_ads_txt_status ) : __( 'Not yet run', 'vcns-security-automation-manager' ) );
-							?>
-						</td>
-					</tr>
-				</tbody>
-			</table>
+			<div class="wp-sam-stat-row">
+				<div class="wp-sam-stat">
+					<span class="wp-sam-stat-label"><?php esc_html_e( 'Authorised-seller records', 'vcns-security-automation-manager' ); ?></span>
+					<span class="wp-sam-stat-value"><?php echo esc_html( number_format( count( $app_ads_txt_store->records() ) ) ); ?></span>
+				</div>
+				<div class="wp-sam-stat">
+					<span class="wp-sam-stat-label"><?php esc_html_e( 'Last refreshed', 'vcns-security-automation-manager' ); ?></span>
+					<span class="wp-sam-stat-value"><?php echo esc_html( $app_ads_txt_store->last_refreshed_at() ?? __( 'Never', 'vcns-security-automation-manager' ) ); ?></span>
+				</div>
+				<div class="wp-sam-stat">
+					<span class="wp-sam-stat-label"><?php esc_html_e( 'Last fetch status', 'vcns-security-automation-manager' ); ?></span>
+					<span class="wp-sam-stat-value">
+						<?php
+						$app_ads_txt_status = $app_ads_txt_store->last_fetch_status();
+						echo esc_html( '' !== $app_ads_txt_status ? ucfirst( $app_ads_txt_status ) : __( 'Not yet run', 'vcns-security-automation-manager' ) );
+						?>
+					</span>
+				</div>
+			</div>
 
 			<p class="description" style="margin-top:1em">
 				<?php esc_html_e( 'The same IAB authorised-sellers format as Ads.txt above, applied to mobile-app inventory. Refreshed automatically once a day; tracked separately since it is a distinct file this site serves.', 'vcns-security-automation-manager' ); ?>

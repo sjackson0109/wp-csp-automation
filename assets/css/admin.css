@@ -815,6 +815,43 @@ details.wp-sam-filter-form form {
 }
 
 /*
+ * Compact key/value stat display -- replaces a narrow, tall two-column
+ * table (one fact per row, capped at max-width:600px) for the small
+ * summaries scattered across Network Intelligence's sub-tabs (Tor, ASN
+ * lookup, Geo-IP, and each Well-Known file's presence/last-refreshed/
+ * last-fetch-status facts). A row of boxes uses the page's actual width
+ * and reads at a glance instead of scrolling down a list of single-fact
+ * rows.
+ */
+.wp-sam-stat-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	margin-top: 1em;
+}
+
+.wp-sam-stat {
+	border: 1px solid #ccd0d4;
+	border-radius: 4px;
+	padding: 10px 16px;
+	background: #fff;
+	min-width: 160px;
+}
+
+.wp-sam-stat-label {
+	display: block;
+	font-size: 0.85em;
+	color: #646970;
+	margin-bottom: 4px;
+}
+
+.wp-sam-stat-value {
+	display: block;
+	font-size: 1.05em;
+	font-weight: 600;
+}
+
+/*
  * Geo-IP country grid (Traffic Controls > Network Intelligence > Geo-IP):
  * a flowing multi-column list of checkboxes, one per ISO country, instead
  * of a single narrow list -- wide enough to actually use the page instead
