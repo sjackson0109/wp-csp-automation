@@ -4,7 +4,7 @@ Tags: security, csp, content security policy, hsts, ssl certificates
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 2.9.86
+Stable tag: 2.9.87
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -115,6 +115,10 @@ When an administrator configures automatic cPanel deployment, once a certificate
 
 == Changelog ==
 
+= 2.9.87 =
+
+* Added: a per-provider DNS-01 setup guide covering all 41 built-in DNS providers (GitHub issue #291) -- credential-creation links, minimum permission scopes, zone-scoping guidance, field-by-field mapping, rotation/revocation steps, and common errors for each, researched directly against each provider's own current documentation with any unconfirmed detail explicitly flagged rather than guessed. New "View setup instructions" link on the Certificates page next to the provider picker.
+
 = 2.9.86 =
 
 * Added: the Evidence Export (Settings/Overview, GitHub issue #178) now includes a SHA-256 checksum so later alteration can be detected, an optional reporting-period date range narrowing the recent-audit-history section, and a new "formal exceptions" section reading the Exceptions feature's own records. Framework mappings (Cyber Essentials, ISO/IEC 27001, PCI DSS, OWASP ASVS, CIS Controls) were already complete.
@@ -181,9 +185,5 @@ When an administrator configures automatic cPanel deployment, once a certificate
 = 2.9.72 =
 
 * Added: an Edit action on Continuous Intelligence > Vendors -- every vendor row (built-in or custom) previously showed only a bare "-" in the Actions column unless it was a custom, deletable one. The underlying storage already supported editing a built-in vendor in place (e.g. to add a vendor-published CIDR range once verified) without touching its built-in status, but the admin UI never exposed a way to reach it. The "Add a vendor" form now doubles as an edit form (pre-filled, with the Key field locked once a vendor exists) when reached via the new Edit link, matching the same edit-in-place pattern already used by Custom Rules.
-
-= 2.9.71 =
-
-* Added: automatic recognition of loopback traffic (127.0.0.0/8, ::1) on the Continuous Intelligence > Identities tab -- a request from the server's own loopback address (wp-cron's own loopback call, a Site Health check, or an administrator testing from the same machine) is now recognised automatically as "Loopback (this server)" instead of sitting in the review queue as Unclassified. This is a new automatic recognition state, not a silent authorisation -- an administrator can still explicitly deny a loopback source (e.g. a site where a reverse proxy makes every visitor look like loopback), and that decision always wins, matching how every other recognition signal in this plugin already works.
 
 Full changelog history: https://github.com/vcns/security-automation-manager/blob/main/CHANGELOG.md

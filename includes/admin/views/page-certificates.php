@@ -177,7 +177,10 @@ if ( '' === trim( $wp_sam_cert_domains_value ) ) {
 						<option value="<?php echo esc_attr( $wp_sam_slug ); ?>" <?php selected( $wp_sam_cert_config['provider'], $wp_sam_slug ); ?>><?php echo esc_html( $wp_sam_class::label() ); ?></option>
 						<?php endforeach; ?>
 					</select>
-					<p class="description"><?php esc_html_e( 'Additional providers can be registered by other plugins via the wp_sam_dns_providers filter.', 'vcns-security-automation-manager' ); ?></p>
+					<p class="description">
+						<?php esc_html_e( 'Additional providers can be registered by other plugins via the wp_sam_dns_providers filter.', 'vcns-security-automation-manager' ); ?>
+						<a href="https://github.com/vcns/security-automation-manager/blob/main/docs/dns-provider-setup-guides.md" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'View setup instructions for every provider', 'vcns-security-automation-manager' ); ?></a>
+					</p>
 				</td>
 			</tr>
 			<?php foreach ( $wp_sam_providers as $wp_sam_slug => $wp_sam_class ) : ?>
