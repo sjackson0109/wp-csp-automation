@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows semantic versioning for plugin releases.
 
+## [2.9.89] - 2026-09-08
+
+### Fixed
+
+- Continuous Intelligence Events, Identities, and Vendors tables (`includes/admin/views/page-intelligence.php`) all reused `wp-sam-violations-table`'s `nth-child` column-width rules, which were tuned for the CSP Violations table's own 7-column layout and silently misapplied to these tables' different column counts/orders -- the actual root cause of the reported "awful spacing" (wrapped Family/Classification labels, wrapped dates, a squeezed Claimed Identity/Vendor column). Each table now has its own dedicated width rules (`wp-sam-events-table`, `wp-sam-identities-table`, `wp-sam-vendors-table`) added alongside the shared base class, following the same pattern already used by `wp-sam-profiles-table` and `wp-sam-dependency-inventory-table`.
+- Identities tab: the Reason input in the Decision column is now wider (110px -> 200px), the table now defaults to sorting by Occurrences descending instead of Last Seen, and a `loopback` identity no longer requires a manual Authorise click -- it renders as "Auto-authorised (loopback)" with only a Deny action available, since `Identity_Resolver`'s own docblock already anticipated an administrator overriding loopback recognition on sites where a reverse proxy terminates every visitor's connection via loopback. `Scanner_Identity_Store`'s recognition-is-never-authorisation invariant is untouched -- this is a display-only change; no decision is written to the database unless an admin explicitly denies it.
+- Vendors tab: the "Add a vendor" / "Edit vendor" form is now a `<details>` disclosure (matching the existing Filters pattern on this same page) instead of always being rendered open -- collapsed by default, automatically open when editing an existing vendor via its Edit link.
+
 ## [2.9.88] - 2026-09-08
 
 ### Added
