@@ -3,7 +3,7 @@
  * Plugin Name:       VCNS Security Automation Manager
  * Plugin URI:        https://github.com/vcns/security-automation-manager
  * Description:       Self-learning security headers, built-in attack detection and rate limiting, file-integrity monitoring, and free TLS certificates. No paywall.
- * Version:           2.9.89
+ * Version:           2.9.90
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            VCNS Tech Ltd
@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // ── Core constants ────────────────────────────────────────────────────────────
-define( 'WP_SAM_VERSION', '2.9.89' );
+define( 'WP_SAM_VERSION', '2.9.90' );
 
 /**
  * Schema version. Increment whenever a database schema change is made.
@@ -263,8 +263,15 @@ define( 'WP_SAM_VERSION', '2.9.89' );
  *        control/surface, with a required business justification, owner,
  *        risk classification, and expiry date (GitHub issue #177). See
  *        Intelligence\Exception_Store.
+ *   v41: no new table -- bumped purely to re-run Activator::seed_default_
+ *        scanner_vendors() on every already-upgraded site (Phase 4C,
+ *        second increment). Adds 10 more built-in search/AI crawlers to
+ *        the sam_scanner_vendors catalogue: YandexBot, Baiduspider,
+ *        DuckDuckBot, Applebot, Sogou web spider, SeznamBot,
+ *        OAI-SearchBot, Amazonbot, DuckAssistBot, and Meta-ExternalAgent.
+ *        See seed_default_scanner_vendors()'s own docblock for sourcing.
  */
-define( 'WP_SAM_DB_VERSION', '40' );
+define( 'WP_SAM_DB_VERSION', '41' );
 
 define( 'WP_SAM_FILE', __FILE__ );
 define( 'WP_SAM_DIR', plugin_dir_path( __FILE__ ) );
