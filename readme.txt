@@ -4,7 +4,7 @@ Tags: security, csp, content security policy, hsts, ssl certificates
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 2.9.87
+Stable tag: 2.9.88
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -115,6 +115,10 @@ When an administrator configures automatic cPanel deployment, once a certificate
 
 == Changelog ==
 
+= 2.9.88 =
+
+* Added: the Security Health summary (Settings/Overview > Security Health, GitHub issue #175) now shows a per-surface CSP enforcement breakdown and distinguishes a surface not enforcing because of an active, administrator-recorded exception from one that simply hasn't been promoted yet, using the real Exceptions feature. The Exceptions row now also counts formal, time-bound exceptions alongside the existing signals it already tracked. The health model is now explicitly versioned (currently v2), shown on the Health tab.
+
 = 2.9.87 =
 
 * Added: a per-provider DNS-01 setup guide covering all 41 built-in DNS providers (GitHub issue #291) -- credential-creation links, minimum permission scopes, zone-scoping guidance, field-by-field mapping, rotation/revocation steps, and common errors for each, researched directly against each provider's own current documentation with any unconfirmed detail explicitly flagged rather than guessed. New "View setup instructions" link on the Certificates page next to the provider picker.
@@ -181,9 +185,5 @@ When an administrator configures automatic cPanel deployment, once a certificate
 = 2.9.73 =
 
 * Fixed: the Settings/Overview page's About tab had drifted badly behind the actual feature set -- it still described "nine further HTTP security headers" (now eleven -- Information Masking and Cache-Control shipped since that text was written) and never mentioned Continuous Intelligence (request observation, nineteen built-in attack detectors, bot/crawler recognition, custom fail2ban-style rules, traffic controls) or Baseline & Drift (file/theme/plugin change detection) at all, despite both being fully shipped features with their own admin pages. Rewrote the "What this plugin covers" and "The gap this fills" sections to reflect the current product.
-
-= 2.9.72 =
-
-* Added: an Edit action on Continuous Intelligence > Vendors -- every vendor row (built-in or custom) previously showed only a bare "-" in the Actions column unless it was a custom, deletable one. The underlying storage already supported editing a built-in vendor in place (e.g. to add a vendor-published CIDR range once verified) without touching its built-in status, but the admin UI never exposed a way to reach it. The "Add a vendor" form now doubles as an edit form (pre-filled, with the Key field locked once a vendor exists) when reached via the new Edit link, matching the same edit-in-place pattern already used by Custom Rules.
 
 Full changelog history: https://github.com/vcns/security-automation-manager/blob/main/CHANGELOG.md

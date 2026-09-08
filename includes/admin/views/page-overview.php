@@ -510,6 +510,15 @@ $status_badge       = static function ( string $status ): void {
 	<p>
 		<?php esc_html_e( 'This is the plain-language version of everything else in this plugin: are your defenses actually enforcing, is anything drifting away from your known-good baseline, are certificates on track to renew, and are there any open exceptions somebody still needs to review? Hover the info icon next to a row for the detail behind its status.', 'vcns-security-automation-manager' ); ?>
 	</p>
+	<p class="description">
+		<?php
+		printf(
+			/* translators: %d: health-model version number */
+			esc_html__( 'Health model version %d.', 'vcns-security-automation-manager' ),
+			(int) Security_Health::MODEL_VERSION
+		);
+		?>
+	</p>
 
 	<table class="widefat striped wp-sam-readiness-table">
 		<thead>
