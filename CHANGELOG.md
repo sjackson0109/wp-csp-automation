@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows semantic versioning for plugin releases.
 
+## [2.9.87] - 2026-09-08
+
+### Added
+
+- Per-provider DNS-01 setup guide (GitHub issue #291): new `docs/dns-provider-setup-guides.md` covers all 41 built-in DNS providers -- credential-creation link, minimum permission/scope, zone-scoping guidance, field-by-field mapping from each provider's own naming to this plugin's `fields()` labels, rotation/revocation steps, common errors, and the ToS/Privacy links already disclosed in `readme.txt`. Every entry states its own evidence/verification status (verified live vs. corroborated vs. explicitly flagged "Not independently verified"), matching the same honesty convention `docs/dns-provider-test-matrix.md` already established for test coverage -- no URL, permission name, or UI label was fabricated from memory. Researched 2026-09-08 directly against each provider's own current documentation. New "View setup instructions" link on the Certificates page next to the provider picker.
+- Notable findings surfaced during this research, flagged for follow-up rather than fixed here: Hetzner's legacy DNS Console was shut down in May 2026 (replaced by per-project tokens, still compatible with this plugin's driver); GoDaddy is mid-migration from its classic API Key/Secret model toward Personal Access Tokens ahead of a 2026 deprecation, which may need a driver update later; DNSPod's legacy Token credential (the pair this plugin's driver uses) has no domain-level scoping available at all, a platform limitation rather than a documentation gap.
+- Automated credential and zone-access verification (testing a configured credential can actually reach the right zone before a real issuance attempt) remains explicitly out of scope, per the issue's own "Future" note.
+
 ## [2.9.86] - 2026-09-08
 
 ### Added
