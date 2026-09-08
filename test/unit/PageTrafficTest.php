@@ -163,6 +163,40 @@ class PageTrafficTest extends TestCase {
 		$this->assertStringContainsString( 'wp_sam_network_rule_delete', $output );
 	}
 
+	// ── Network Intelligence tab -- compact stat-row layout ─────────────────
+
+	public function test_tor_subtab_renders_stats_as_a_compact_row_not_a_tall_table(): void {
+		$_GET['tab'] = 'network-intelligence';
+
+		ob_start();
+		require WP_SAM_DIR . 'includes/admin/views/page-traffic.php';
+		$output = (string) ob_get_clean();
+
+		unset( $_GET['tab'] );
+
+		$this->assertStringContainsString( 'wp-sam-stat-row', $output );
+		$this->assertStringContainsString( 'Known exit nodes', $output );
+		$this->assertStringNotContainsString( 'max-width:600px', $output );
+	}
+
+	public function test_well_known_subtab_renders_every_file_as_a_stat_row(): void {
+		$_GET['tab']    = 'network-intelligence';
+		$_GET['subtab'] = 'well-known';
+		$GLOBALS['_wpdb_get_results'] = array();
+
+		ob_start();
+		require WP_SAM_DIR . 'includes/admin/views/page-traffic.php';
+		$output = (string) ob_get_clean();
+
+		unset( $_GET['tab'], $_GET['subtab'] );
+
+		foreach ( array( 'Robots.txt', 'Agents.txt', 'Security.txt', 'Humans.txt', 'Ads.txt', 'App-Ads.txt' ) as $well_known_label ) {
+			$this->assertStringContainsString( $well_known_label, $output );
+		}
+		$this->assertStringNotContainsString( 'max-width:600px', $output );
+		$this->assertStringNotContainsString( 'width:200px', $output );
+	}
+
 	// ── Network Intelligence tab -- Geo-IP sub-tab's Country Block List ─────
 
 	public function test_geoip_subtab_renders_country_grid_with_nothing_blocked(): void {

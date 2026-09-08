@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows semantic versioning for plugin releases.
 
+## [2.9.91] - 2026-09-08
+
+### Fixed
+
+- Traffic Controls > Network Intelligence: the small summary tables on the Tor Exit List, ASN Lookup, Geo-IP, and Well-Known Files sub-tabs (10 instances total, including all six Well-Known files: Robots.txt, Agents.txt, Security.txt, Humans.txt, Ads.txt, App-Ads.txt) used a tall, narrow two-column `<table>` layout, one fact per row, two of them still capped at `max-width:600px`. All 10 now render via a new compact `.wp-sam-stat-row`/`.wp-sam-stat` flex layout (`assets/css/admin.css`) that uses the page's actual width instead of a fixed cap.
+- Confirmed already correct in this branch and left untouched: the Policy tab's `wp-sam-policy-table` (per-surface rows, Save action on the right via the `form=` attribute technique) and the Blocks tab's `wp-sam-blocks-table` (Reason column absorbs the remaining width, Surface pinned small) both already had dedicated, well-considered column-width CSS from earlier work; so does the Network Intelligence sub-tab navigation itself (`wp-sam-subtab-wrapper`, tabs for Tor/ASN/Geo-IP/Well-Known Files/Network Rules). Only the still-narrow stat displays inside those sub-tabs needed fixing.
+
 ## [2.9.90] - 2026-09-08
 
 ### Added
