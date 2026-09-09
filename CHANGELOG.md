@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows semantic versioning for plugin releases.
 
+## [2.9.93] - 2026-09-09
+
+### Added
+
+- New `.github/workflows/development-build.yml`: on every push to `development`, builds the GitHub-channel ZIP (same build steps as `release-package.yml`, GitHub-channel only) and publishes/updates a single rolling pre-release at tag `development-latest` (title/notes include the plugin version and short commit SHA at build time). Gives a stable, bookmarkable download of "whatever's currently on development" for manual testing, without needing to find a specific PR's build artifact (which also already existed via `release-package.yml`'s own `pull_request` trigger, but expires after 30 days and isn't easily discoverable). The existing full CI matrix (`ci.yml`) already re-verifies every push to `development` independently; this workflow only builds and publishes, it does not re-run tests.
+
 ## [2.9.92] - 2026-09-09
 
 ### Fixed
