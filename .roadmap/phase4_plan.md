@@ -166,8 +166,9 @@ Lowest priority in this document, deliberately -- §22's own text and the origin
   - `docs/index.html` (v2.9.70) -- done. `#start-here` intro now names XSS as the threat CSP defends against; the `#pillars` card grid gained a short "why this matters" clause per header (clickjacking, Referer leakage, camera/geolocation abuse, HSTS first-request interception, cross-site resource pulling, COOP/COEP side-channel isolation).
   - `docs/user-guide.html`, `docs/faq.html` -- not started. **Caution:** `test/unit/VersionConsistencyTest.php` asserts exact substrings in both (WP/PHP minimum-version wording, the `£X.XX/month or £Y.YY/year` subscription price) -- check that test file before rewording near those spots.
 
+- Traffic Controls (v2.9.77) -- `includes/admin/views/page-traffic.php`'s Policy, IP Rules, and Blocks tabs gained explainer paragraphs (rate limits and Observe/Enforce, the Warn/Throttle/Temporary-block/Extended-block ladder, CIDR ranges and Allow-vs-Block, Release-vs-Make-Permanent). Network Intelligence, Detectors, and Custom Rules on this same page already had this level of detail from when those features were originally built -- **Traffic Controls is now fully retrofitted.**
+
 **Remaining admin pages, not yet started** (rough order):
-- Traffic Controls (`page-traffic.php`) -- Policy, IP Rules, Blocks, Network Intelligence, Detectors, Custom Rules tabs.
 - The 14 pillar pages -- both the shared `page-pillar-simple.php` template's per-pillar `$intro_html` (set in `Admin_UI`'s `render_*` methods, several already reasonably detailed) and the dedicated pillar view files (HSTS, Cross-Origin, Reverse Tabnabbing, Cache-Control, Permissions-Policy, Information Masking, Scripts internal/external).
 - Continuous Intelligence (`page-intelligence.php`), Baseline & Drift (`page-baseline.php`), Certificates (`page-certificates.php`).
 
