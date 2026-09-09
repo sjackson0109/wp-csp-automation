@@ -36,27 +36,6 @@ define( 'ARRAY_A',               'ARRAY_A' );
 define( 'ARRAY_N',               'ARRAY_N' );
 define( 'OBJECT',                'OBJECT' );
 
-// ── PSR-4 autoloader (mirrors security-automation-manager.php) ─────────────────────────
-spl_autoload_register( static function ( string $class ): void {
-	$prefix = 'WP_SAM\\';
-	if ( strncmp( $prefix, $class, strlen( $prefix ) ) !== 0 ) {
-		return;
-	}
-	$relative = substr( $class, strlen( $prefix ) );
-	$parts    = explode( '\\', $relative );
-	$filename = 'class-' . strtolower( str_replace( '_', '-', (string) array_pop( $parts ) ) ) . '.php';
-	$subdir   = ! empty( $parts ) ? strtolower( implode( '/', $parts ) ) . '/' : '';
-	$file     = WP_SAM_DIR . 'includes/' . $subdir . $filename;
-	if ( ! is_readable( $file ) ) {
-		$file = WP_SAM_DIR . 'offline/' . $subdir . $filename;
-	}
-	if ( is_readable( $file ) ) {
-		require_once $file;
-	} else {
-		trigger_error( "WP_SAM test autoloader: cannot resolve {$class}", E_USER_NOTICE );
-	}
-} );
-
 // ── WordPress function stubs ──────────────────────────────────────────────────
 // These are minimal implementations that satisfy the function signatures
 // called by the classes under test. They do not replicate WordPress behaviour
@@ -207,6 +186,12 @@ if ( ! function_exists( 'esc_attr' ) ) {
 if ( ! function_exists( 'esc_html' ) ) {
 	function esc_html( string $text ): string {
 		return htmlspecialchars( $text, ENT_QUOTES, 'UTF-8' );
+	}
+}
+
+if ( ! function_exists( 'esc_js' ) ) {
+	function esc_js( string $text ): string {
+		return addslashes( $text );
 	}
 }
 
@@ -649,6 +634,23 @@ if ( ! function_exists( 'plugin_basename' ) ) {
 	}
 }
 
+if ( ! function_exists( 'is_email' ) ) {
+	function is_email( string $email ): string|false {
+		return false !== filter_var( $email, FILTER_VALIDATE_EMAIL ) ? $email : false;
+	}
+}
+
+if ( ! function_exists( 'wp_mail' ) ) {
+	function wp_mail( string $to, string $subject, string $message ): bool {
+		$GLOBALS['_wp_mail_calls'][] = array(
+			'to'      => $to,
+			'subject' => $subject,
+			'message' => $message,
+		);
+		return true;
+	}
+}
+
 if ( ! function_exists( 'get_bloginfo' ) ) {
 	function get_bloginfo( string $show = '' ): string {
 		if ( 'version' === $show ) {
@@ -858,10 +860,12 @@ if ( ! class_exists( 'WP_Error' ) ) {
 	class WP_Error {
 		private string $code;
 		private string $message;
+		private mixed $data;
 
-		public function __construct( string $code = '', string $message = '' ) {
+		public function __construct( string $code = '', string $message = '', mixed $data = '' ) {
 			$this->code    = $code;
 			$this->message = $message;
+			$this->data    = $data;
 		}
 
 		public function get_error_code(): string {
@@ -870,6 +874,10 @@ if ( ! class_exists( 'WP_Error' ) ) {
 
 		public function get_error_message(): string {
 			return $this->message;
+		}
+
+		public function get_error_data(): mixed {
+			return $this->data;
 		}
 	}
 }
@@ -971,6 +979,7 @@ if ( ! class_exists( 'wpdb_stub' ) ) {
 
 		public function get_results( string $query, string $output = 'ARRAY_A' ): array {
 			$GLOBALS['_wpdb_last_get_results_query'] = $query;
+			$GLOBALS['_wpdb_get_results_log'][]       = $query;
 			if ( ! empty( $GLOBALS['_wpdb_get_results_queue'] ) && is_array( $GLOBALS['_wpdb_get_results_queue'] ) ) {
 				return array_shift( $GLOBALS['_wpdb_get_results_queue'] );
 			}
@@ -1113,6 +1122,7 @@ function wp_test_reset_globals(): void {
 	$GLOBALS['_wp_remote_all_requests']  = [];
 	$GLOBALS['_wp_spawn_cron_calls']     = 0;
 	$GLOBALS['_wp_status_header_calls']  = [];
+	$GLOBALS['_wp_mail_calls']           = [];
 	$GLOBALS['_wp_is_admin']             = false;
 	$GLOBALS['_wp_is_ssl']               = false;
 	$GLOBALS['_wp_doing_cron']           = false;
@@ -1130,6 +1140,7 @@ function wp_test_reset_globals(): void {
 	$GLOBALS['_wpdb_get_results']        = [];
 	$GLOBALS['_wpdb_get_results_queue']  = [];
 	$GLOBALS['_wpdb_last_get_results_query'] = null;
+	$GLOBALS['_wpdb_get_results_log']    = [];
 	$GLOBALS['_wpdb_get_col']            = [];
 	$GLOBALS['_wpdb_insert_result']      = 1;
 	$GLOBALS['_wpdb_update_result']      = 0;
@@ -1152,6 +1163,46 @@ function wp_test_reset_globals(): void {
 
 // Initialise globals so classes loaded at parse time do not hit undefined array errors.
 wp_test_reset_globals();
+
+// ── PSR-4 autoloader (mirrors security-automation-manager.php) ─────────────────────────
+// Registered here -- immediately before the stub requires below, rather than
+// at the top of the file as before -- so there is no longer any window
+// between registration and first use where a WP_SAM\* class touched by one
+// of the WordPress-only stubs above could load the real production class
+// instead of a stub (GitHub issue #164, code-review-findings.json). It can't
+// move later than this: Stub_Policy_Data_Loader.php below implements the
+// real WP_SAM\CSP\Policy_Data_Loader interface, so the autoloader must
+// already be active by the time that file is required.
+spl_autoload_register( static function ( string $class ): void {
+	$prefix = 'WP_SAM\\';
+	if ( strncmp( $prefix, $class, strlen( $prefix ) ) !== 0 ) {
+		return;
+	}
+	$relative = substr( $class, strlen( $prefix ) );
+	$parts    = explode( '\\', $relative );
+	$filename = 'class-' . strtolower( str_replace( '_', '-', (string) array_pop( $parts ) ) ) . '.php';
+	$subdir   = ! empty( $parts ) ? strtolower( implode( '/', $parts ) ) . '/' : '';
+	$file     = WP_SAM_DIR . 'includes/' . $subdir . $filename;
+	if ( ! is_readable( $file ) ) {
+		$file = WP_SAM_DIR . 'offline/' . $subdir . $filename;
+	}
+	if ( is_readable( $file ) ) {
+		require_once $file;
+	} else {
+		// Deliberately silent, not a throw: several tests for commercial
+		// offline/ classes (e.g. EntitlementStoreTest, WebhookControllerTest)
+		// call class_exists( Some_Offline_Class::class ) in setUp() and
+		// markTestSkipped() when it's false -- the correct, intentional
+		// behaviour whenever offline/ isn't present, which is the normal
+		// case in public CI (see GitHub issue #164, code-review-findings.json,
+		// finding on this exact fallback -- throwing here was tried and
+		// confirmed to turn every one of those graceful skips into a hard
+		// CI failure instead). A genuinely-missing non-offline class still
+		// surfaces immediately as PHP's own native "Class not found" fatal
+		// the moment anything tries to instantiate it.
+		trigger_error( "WP_SAM test autoloader: cannot resolve {$class}", E_USER_NOTICE );
+	}
+} );
 
 // ── Test stubs ────────────────────────────────────────────────────────────────
 // Load namespace-scoped stubs before any plugin class that might define the

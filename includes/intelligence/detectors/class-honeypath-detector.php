@@ -45,6 +45,10 @@ final class Honeypath_Detector extends Pattern_Detector {
 		return 'deception';
 	}
 
+	public function description(): string {
+		return __( 'Flags any request to one of your configured decoy paths -- no legitimate visitor should ever hit one.', 'vcns-security-automation-manager' );
+	}
+
 	public function applicable_surfaces(): array {
 		return array();
 	}

@@ -38,6 +38,14 @@
 		const surface = $btn.data( 'surface' );
 		const mode    = $btn.data( 'mode' );
 
+		let reason = '';
+		if ( mode === 'enforce' ) {
+			reason = requiredReason( wpSamAdmin.i18n.enforceReasonPrompt || 'Reason for promoting this surface to enforce mode:' );
+			if ( reason === null ) {
+				return;
+			}
+		}
+
 		$btn.prop( 'disabled', true );
 
 		$.post( wpSamAdmin.ajaxUrl, {
@@ -45,6 +53,7 @@
 			nonce:   wpSamAdmin.nonce,
 			surface: surface,
 			mode:    mode,
+			reason:  reason,
 		} )
 		.done( function ( res ) {
 			if ( res.success ) {
@@ -552,6 +561,38 @@
 		} )
 		.always( function () {
 			$btn.prop( 'disabled', false );
+		} );
+	} );
+
+	// Advanced Intelligence -> Campaigns: one shared Reason field per row
+	// feeds whichever form is actually submitted (Acknowledge/Dismiss, or
+	// Block Participants) -- typing it once is enough. Each form still
+	// gets its own copy of the value on submit, so the existing admin-post
+	// handlers and their own "note is required" server-side check are
+	// untouched; this only removes the duplicate visible input.
+	$( '.wp-sam-campaign-reason' ).each( function () {
+		const $reason = $( this );
+		const formIds = ( $reason.data( 'campaign-forms' ) || '' ).split( ' ' );
+
+		formIds.forEach( function ( formId ) {
+			if ( ! formId ) {
+				return;
+			}
+			$( '#' + formId ).on( 'submit', function ( e ) {
+				const value = $.trim( $reason.val() );
+				if ( '' === value ) {
+					e.preventDefault();
+					const el = $reason.get( 0 );
+					if ( el && el.setCustomValidity ) {
+						el.setCustomValidity( 'Reason is required.' );
+						el.reportValidity();
+						el.setCustomValidity( '' );
+					}
+					$reason.trigger( 'focus' );
+					return;
+				}
+				$( this ).find( '.wp-sam-campaign-note-target' ).val( value );
+			} );
 		} );
 	} );
 } )( jQuery );

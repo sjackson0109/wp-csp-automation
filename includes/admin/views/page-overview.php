@@ -30,34 +30,38 @@ global $wpdb;
 
 // Current tab.
 $tab          = isset( $_GET['tab'] ) ? sanitize_text_field( wp_unslash( $_GET['tab'] ) ) : 'overview';
-$allowed_tabs = array( 'overview', 'health', 'readiness', 'recovery', 'updates', 'about' );
+$allowed_tabs = array( 'overview', 'health', 'readiness', 'recovery', 'exceptions', 'updates', 'about' );
 if ( ! in_array( $tab, $allowed_tabs, true ) ) {
 	$tab = 'overview';
 }
 
 $base_url = admin_url( 'admin.php?page=security-automation-manager' );
 $tab_help = array(
-	'overview'  => array(
+	'overview'   => array(
 		'label'       => __( 'Overview', 'vcns-security-automation-manager' ),
 		'description' => __( 'At-a-glance status for every pillar this plugin manages, and a link to configure each one.', 'vcns-security-automation-manager' ),
 	),
-	'health'    => array(
+	'health'     => array(
 		'label'       => __( 'Security Health', 'vcns-security-automation-manager' ),
 		'description' => __( 'A plain-language summary of security outcomes -- enforcement, drift, certificates, dependencies, and open exceptions -- plus an evidence export for reviews and audits.', 'vcns-security-automation-manager' ),
 	),
-	'readiness' => array(
+	'readiness'  => array(
 		'label'       => __( 'Readiness', 'vcns-security-automation-manager' ),
 		'description' => __( 'Plugin-specific checks for schema, runtime defaults, and reporting configuration.', 'vcns-security-automation-manager' ),
 	),
-	'recovery'  => array(
+	'recovery'   => array(
 		'label'       => __( 'Recovery', 'vcns-security-automation-manager' ),
 		'description' => __( 'Schema-downgrade status, configuration snapshot restore, full data reset, and configuration export/import.', 'vcns-security-automation-manager' ),
 	),
-	'updates'   => array(
+	'exceptions' => array(
+		'label'       => __( 'Exceptions', 'vcns-security-automation-manager' ),
+		'description' => __( 'Controlled, time-bound weakenings of a control or surface -- each one requires a reason, an owner, and an expiry date, is auditable, and can be revoked immediately.', 'vcns-security-automation-manager' ),
+	),
+	'updates'    => array(
 		'label'       => __( 'Updates', 'vcns-security-automation-manager' ),
 		'description' => __( 'Installed version, active build channel, and (GitHub-channel builds only) manifest, checksum, and applied-update diagnostics.', 'vcns-security-automation-manager' ),
 	),
-	'about'     => array(
+	'about'      => array(
 		'label'       => __( 'About', 'vcns-security-automation-manager' ),
 		'description' => __( 'Who built this plugin, why, and where to find the full documentation.', 'vcns-security-automation-manager' ),
 	),
@@ -506,6 +510,15 @@ $status_badge       = static function ( string $status ): void {
 	<p>
 		<?php esc_html_e( 'This is the plain-language version of everything else in this plugin: are your defenses actually enforcing, is anything drifting away from your known-good baseline, are certificates on track to renew, and are there any open exceptions somebody still needs to review? Hover the info icon next to a row for the detail behind its status.', 'vcns-security-automation-manager' ); ?>
 	</p>
+	<p class="description">
+		<?php
+		printf(
+			/* translators: %d: health-model version number */
+			esc_html__( 'Health model version %d.', 'vcns-security-automation-manager' ),
+			(int) Security_Health::MODEL_VERSION
+		);
+		?>
+	</p>
 
 	<table class="widefat striped wp-sam-readiness-table">
 		<thead>
@@ -535,11 +548,18 @@ $status_badge       = static function ( string $status ): void {
 
 	<h2 style="margin-top:2em"><?php esc_html_e( 'Evidence Export', 'vcns-security-automation-manager' ); ?></h2>
 	<p class="description">
-		<?php esc_html_e( 'Downloads a JSON snapshot of currently-configured controls, open exceptions, certificate state, baseline/drift status, and recent audit history -- useful for a security review, an MSP report, or audit preparation. This is evidence to support a review, not a compliance certification.', 'vcns-security-automation-manager' ); ?>
+		<?php esc_html_e( 'Downloads a JSON snapshot of currently-configured controls, open exceptions, certificate state, baseline/drift status, and recent audit history -- useful for a security review, an MSP report, or audit preparation. This is evidence to support a review, not a compliance certification. The export includes a checksum so later alteration can be detected.', 'vcns-security-automation-manager' ); ?>
 	</p>
 	<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 		<?php wp_nonce_field( 'wp_sam_export_evidence' ); ?>
 		<input type="hidden" name="action" value="wp_sam_export_evidence" />
+		<p>
+			<label for="wp_sam_evidence_period_from"><?php esc_html_e( 'Reporting period (optional):', 'vcns-security-automation-manager' ); ?></label>
+			<input type="date" id="wp_sam_evidence_period_from" name="period_from">
+			<?php esc_html_e( 'to', 'vcns-security-automation-manager' ); ?>
+			<input type="date" name="period_to">
+			<span class="description"><?php esc_html_e( 'Bounds only the recent-audit-history section; every other section is a snapshot of current configuration, which has no date range to narrow. Leave both blank for the full audit history.', 'vcns-security-automation-manager' ); ?></span>
+		</p>
 		<?php submit_button( __( 'Download Evidence Export', 'vcns-security-automation-manager' ), 'primary', '', false ); ?>
 	</form>
 
@@ -594,6 +614,13 @@ $status_badge       = static function ( string $status ): void {
 	<div class="notice notice-success is-dismissible">
 		<p><?php esc_html_e( 'Configuration snapshot restored.', 'vcns-security-automation-manager' ); ?></p>
 	</div>
+	<?php elseif ( 'partial' === $restore_result ) : ?>
+	<div class="notice notice-warning is-dismissible">
+		<p>
+			<?php esc_html_e( 'Snapshot restored, but one or more tables in it were missing from the live database and could not be restored:', 'vcns-security-automation-manager' ); ?>
+			<?php echo '' !== $restore_reason ? esc_html( $restore_reason ) : ''; ?>
+		</p>
+	</div>
 	<?php elseif ( 'failed' === $restore_result ) : ?>
 	<div class="notice notice-error is-dismissible">
 		<p>
@@ -611,7 +638,7 @@ $status_badge       = static function ( string $status ): void {
 		printf(
 			wp_kses(
 				/* translators: %s: link to the rollback and recovery documentation */
-				__( 'Snapshots cover policy profiles, source/hash approvals, other pillar profiles, dependency classifications, and certificate records -- never the audit log or violation history, which are append-only and never overwritten. For anything beyond what\'s here, including swapping plugin code itself, see %s.', 'vcns-security-automation-manager' ),
+				__( 'Snapshots cover policy profiles, source/hash approvals, other pillar profiles, dependency classifications, certificate records, time-bound exceptions, and the automation-posture option -- never the audit log, violation history, or policy-change decision ledger, which are append-only and never overwritten. For anything beyond what\'s here, including swapping plugin code itself, see %s.', 'vcns-security-automation-manager' ),
 				array(
 					'a' => array(
 						'href'   => array(),
@@ -651,6 +678,29 @@ $status_badge       = static function ( string $status ): void {
 				</td>
 				<td>
 					<?php if ( $snapshot['restorable'] ) : ?>
+						<?php $snapshot_contents = Rollback_Guard::snapshot_contents( $snapshot['id'] ); ?>
+						<?php if ( ! empty( $snapshot_contents ) ) : ?>
+					<details style="margin-bottom:.5em">
+						<summary style="cursor:pointer"><?php esc_html_e( 'Preview what this would overwrite', 'vcns-security-automation-manager' ); ?></summary>
+						<ul style="margin:.5em 0 0 1.5em;list-style:disc">
+							<?php foreach ( $snapshot_contents['tables'] as $table_suffix => $row_count ) : ?>
+							<li>
+								<?php
+								printf(
+									/* translators: 1: table name, 2: number of rows */
+									esc_html( _n( '%1$s: %2$d row', '%1$s: %2$d rows', $row_count, 'vcns-security-automation-manager' ) ),
+									esc_html( $table_suffix ),
+									(int) $row_count
+								);
+								?>
+							</li>
+							<?php endforeach; ?>
+							<?php if ( ! empty( $snapshot_contents['options'] ) ) : ?>
+							<li><?php echo esc_html( sprintf( /* translators: %s: comma-separated option names */ __( 'Options: %s', 'vcns-security-automation-manager' ), implode( ', ', $snapshot_contents['options'] ) ) ); ?></li>
+							<?php endif; ?>
+						</ul>
+					</details>
+					<?php endif; ?>
 					<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="display:flex;align-items:center;gap:.5em;">
 						<?php wp_nonce_field( 'wp_sam_restore_snapshot' ); ?>
 						<input type="hidden" name="action" value="wp_sam_restore_snapshot">
@@ -747,6 +797,198 @@ $status_badge       = static function ( string $status ): void {
 		</table>
 		<?php submit_button( __( 'Reset Plugin Data', 'vcns-security-automation-manager' ), 'delete' ); ?>
 	</form>
+
+	<?php elseif ( 'exceptions' === $tab ) : ?>
+
+		<?php
+		$exception_store = new \WP_SAM\Intelligence\Exception_Store();
+		$exceptions      = $exception_store->all();
+
+		$exception_errors = get_transient( 'wp_sam_exception_errors_' . get_current_user_id() );
+		$exception_errors = is_array( $exception_errors ) ? $exception_errors : array();
+		$exception_input  = get_transient( 'wp_sam_exception_input_' . get_current_user_id() );
+		$exception_input  = is_array( $exception_input ) ? $exception_input : array();
+		delete_transient( 'wp_sam_exception_errors_' . get_current_user_id() );
+		delete_transient( 'wp_sam_exception_input_' . get_current_user_id() );
+
+		$exception_form = array_merge(
+			array(
+				'control'                 => '',
+				'surface'                 => '',
+				'weaker_value'            => '',
+				'business_justification'  => '',
+				'technical_justification' => '',
+				'owner'                   => '',
+				'approver'                => '',
+				'compensating_control'    => '',
+				'risk_classification'     => 'medium',
+				'reference'               => '',
+				'is_privileged_override'  => false,
+				'expiry_date'             => '',
+			),
+			$exception_input
+		);
+
+		$exception_risk_labels   = array(
+			'low'    => __( 'Low', 'vcns-security-automation-manager' ),
+			'medium' => __( 'Medium', 'vcns-security-automation-manager' ),
+			'high'   => __( 'High', 'vcns-security-automation-manager' ),
+		);
+		$exception_status_labels = array(
+			'active'  => __( 'Active', 'vcns-security-automation-manager' ),
+			'expired' => __( 'Expired', 'vcns-security-automation-manager' ),
+			'revoked' => __( 'Revoked', 'vcns-security-automation-manager' ),
+		);
+		?>
+
+		<p class="description">
+			<?php esc_html_e( 'Sometimes a control genuinely needs to be weakened for a specific surface -- a legacy integration, a third-party embed. Record it here as a controlled, auditable exception rather than a silent override: every exception requires a reason and an owner, expires on its own unless a privileged override is used, and can be revoked immediately. Every creation, extension, and revocation is written to the audit log.', 'vcns-security-automation-manager' ); ?>
+		</p>
+
+		<?php if ( ! empty( $exception_errors ) ) : ?>
+		<div class="notice notice-error inline" style="padding:12px 16px;margin:1em 0;">
+			<p style="margin-top:0"><strong><?php esc_html_e( 'Exception not saved:', 'vcns-security-automation-manager' ); ?></strong></p>
+			<ul style="margin-bottom:0;list-style:disc;padding-left:1.5em">
+				<?php foreach ( $exception_errors as $exception_error ) : ?>
+				<li><?php echo esc_html( $exception_error ); ?></li>
+				<?php endforeach; ?>
+			</ul>
+		</div>
+		<?php endif; ?>
+
+		<table class="widefat fixed striped wp-sam-violations-table" style="margin-top:1em">
+			<thead>
+				<tr>
+					<th><?php esc_html_e( 'Control', 'vcns-security-automation-manager' ); ?></th>
+					<th><?php esc_html_e( 'Surface', 'vcns-security-automation-manager' ); ?></th>
+					<th><?php esc_html_e( 'Owner', 'vcns-security-automation-manager' ); ?></th>
+					<th><?php esc_html_e( 'Risk', 'vcns-security-automation-manager' ); ?></th>
+					<th><?php esc_html_e( 'Status', 'vcns-security-automation-manager' ); ?></th>
+					<th><?php esc_html_e( 'Expires', 'vcns-security-automation-manager' ); ?></th>
+					<th><?php esc_html_e( 'Actions', 'vcns-security-automation-manager' ); ?></th>
+				</tr>
+			</thead>
+			<tbody>
+			<?php foreach ( $exceptions as $exception ) : ?>
+				<tr>
+					<td><?php echo esc_html( (string) $exception['control'] ); ?></td>
+					<td><?php echo esc_html( '' !== (string) $exception['surface'] ? ucfirst( (string) $exception['surface'] ) : __( 'All', 'vcns-security-automation-manager' ) ); ?></td>
+					<td><?php echo esc_html( (string) $exception['owner'] ); ?></td>
+					<td><?php echo esc_html( $exception_risk_labels[ $exception['risk_classification'] ] ?? (string) $exception['risk_classification'] ); ?></td>
+					<td><?php echo esc_html( $exception_status_labels[ $exception['review_status'] ] ?? (string) $exception['review_status'] ); ?></td>
+					<td><?php echo esc_html( ! empty( $exception['expiry_date'] ) ? (string) $exception['expiry_date'] : __( 'Never (privileged override)', 'vcns-security-automation-manager' ) ); ?></td>
+					<td style="white-space:nowrap">
+					<?php if ( 'active' === $exception['review_status'] ) : ?>
+						<details style="display:inline-block">
+							<summary style="cursor:pointer;display:inline"><?php esc_html_e( 'Extend', 'vcns-security-automation-manager' ); ?></summary>
+							<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin-top:6px">
+								<?php wp_nonce_field( 'wp_sam_exception_extend' ); ?>
+								<input type="hidden" name="action" value="wp_sam_exception_extend">
+								<input type="hidden" name="exception_id" value="<?php echo esc_attr( (string) $exception['id'] ); ?>">
+								<input type="date" name="new_expiry_date" required>
+								<input type="text" name="reason" placeholder="<?php esc_attr_e( 'Reason for extending', 'vcns-security-automation-manager' ); ?>" required style="width:100%;max-width:220px">
+								<button type="submit" class="button button-small"><?php esc_html_e( 'Extend', 'vcns-security-automation-manager' ); ?></button>
+							</form>
+						</details>
+						<details style="display:inline-block;margin-left:6px">
+							<summary style="cursor:pointer;display:inline"><?php esc_html_e( 'Revoke', 'vcns-security-automation-manager' ); ?></summary>
+							<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin-top:6px">
+								<?php wp_nonce_field( 'wp_sam_exception_revoke' ); ?>
+								<input type="hidden" name="action" value="wp_sam_exception_revoke">
+								<input type="hidden" name="exception_id" value="<?php echo esc_attr( (string) $exception['id'] ); ?>">
+								<input type="text" name="reason" placeholder="<?php esc_attr_e( 'Reason for revoking', 'vcns-security-automation-manager' ); ?>" required style="width:100%;max-width:220px">
+								<button type="submit" class="button button-small"><?php esc_html_e( 'Revoke now', 'vcns-security-automation-manager' ); ?></button>
+							</form>
+						</details>
+					<?php else : ?>
+						&#8212;
+					<?php endif; ?>
+					</td>
+				</tr>
+			<?php endforeach; ?>
+			<?php if ( empty( $exceptions ) ) : ?>
+				<tr><td colspan="7"><?php esc_html_e( 'No exceptions recorded yet.', 'vcns-security-automation-manager' ); ?></td></tr>
+			<?php endif; ?>
+			</tbody>
+		</table>
+
+		<h2 id="wp-sam-exception-form" style="margin-top:2em"><?php esc_html_e( 'Create a new exception', 'vcns-security-automation-manager' ); ?></h2>
+		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+			<?php wp_nonce_field( 'wp_sam_exception_create' ); ?>
+			<input type="hidden" name="action" value="wp_sam_exception_create">
+			<table class="form-table" role="presentation">
+				<tr>
+					<th scope="row"><label for="wp_sam_exception_control"><?php esc_html_e( 'Affected control', 'vcns-security-automation-manager' ); ?></label></th>
+					<td><input type="text" id="wp_sam_exception_control" name="control" class="regular-text" value="<?php echo esc_attr( (string) $exception_form['control'] ); ?>" required></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="wp_sam_exception_surface"><?php esc_html_e( 'Affected surface', 'vcns-security-automation-manager' ); ?></label></th>
+					<td>
+						<select id="wp_sam_exception_surface" name="surface">
+							<option value="" <?php selected( '', $exception_form['surface'] ); ?>><?php esc_html_e( 'All surfaces', 'vcns-security-automation-manager' ); ?></option>
+							<?php foreach ( array( 'frontend', 'admin', 'login', 'api' ) as $exception_surface_option ) : ?>
+							<option value="<?php echo esc_attr( $exception_surface_option ); ?>" <?php selected( $exception_surface_option, $exception_form['surface'] ); ?>><?php echo esc_html( ucfirst( $exception_surface_option ) ); ?></option>
+							<?php endforeach; ?>
+						</select>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="wp_sam_exception_weaker_value"><?php esc_html_e( 'Requested weaker value', 'vcns-security-automation-manager' ); ?></label></th>
+					<td><textarea id="wp_sam_exception_weaker_value" name="weaker_value" class="large-text" rows="2" required><?php echo esc_textarea( (string) $exception_form['weaker_value'] ); ?></textarea></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="wp_sam_exception_business_justification"><?php esc_html_e( 'Business justification (reason)', 'vcns-security-automation-manager' ); ?></label></th>
+					<td><textarea id="wp_sam_exception_business_justification" name="business_justification" class="large-text" rows="2" required><?php echo esc_textarea( (string) $exception_form['business_justification'] ); ?></textarea></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="wp_sam_exception_technical_justification"><?php esc_html_e( 'Technical justification', 'vcns-security-automation-manager' ); ?></label></th>
+					<td><textarea id="wp_sam_exception_technical_justification" name="technical_justification" class="large-text" rows="2"><?php echo esc_textarea( (string) $exception_form['technical_justification'] ); ?></textarea></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="wp_sam_exception_owner"><?php esc_html_e( 'Owner', 'vcns-security-automation-manager' ); ?></label></th>
+					<td><input type="text" id="wp_sam_exception_owner" name="owner" class="regular-text" value="<?php echo esc_attr( (string) $exception_form['owner'] ); ?>" required></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="wp_sam_exception_approver"><?php esc_html_e( 'Approver', 'vcns-security-automation-manager' ); ?></label></th>
+					<td><input type="text" id="wp_sam_exception_approver" name="approver" class="regular-text" value="<?php echo esc_attr( (string) $exception_form['approver'] ); ?>"></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="wp_sam_exception_compensating_control"><?php esc_html_e( 'Compensating control', 'vcns-security-automation-manager' ); ?></label></th>
+					<td><textarea id="wp_sam_exception_compensating_control" name="compensating_control" class="large-text" rows="2"><?php echo esc_textarea( (string) $exception_form['compensating_control'] ); ?></textarea></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="wp_sam_exception_risk_classification"><?php esc_html_e( 'Risk classification', 'vcns-security-automation-manager' ); ?></label></th>
+					<td>
+						<select id="wp_sam_exception_risk_classification" name="risk_classification">
+							<?php foreach ( $exception_risk_labels as $exception_risk_key => $exception_risk_label ) : ?>
+							<option value="<?php echo esc_attr( $exception_risk_key ); ?>" <?php selected( $exception_risk_key, $exception_form['risk_classification'] ); ?>><?php echo esc_html( $exception_risk_label ); ?></option>
+							<?php endforeach; ?>
+						</select>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="wp_sam_exception_reference"><?php esc_html_e( 'Related ticket or reference', 'vcns-security-automation-manager' ); ?></label></th>
+					<td><input type="text" id="wp_sam_exception_reference" name="reference" class="regular-text" value="<?php echo esc_attr( (string) $exception_form['reference'] ); ?>"></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="wp_sam_exception_expiry_date"><?php esc_html_e( 'Expiry date', 'vcns-security-automation-manager' ); ?></label></th>
+					<td>
+						<input type="date" id="wp_sam_exception_expiry_date" name="expiry_date" value="<?php echo esc_attr( (string) $exception_form['expiry_date'] ); ?>">
+						<p class="description"><?php esc_html_e( 'Required unless a privileged override is used below. You will be notified before this exception expires; it returns to review automatically once it does.', 'vcns-security-automation-manager' ); ?></p>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><?php esc_html_e( 'Privileged override', 'vcns-security-automation-manager' ); ?></th>
+					<td>
+						<label>
+							<input type="checkbox" name="is_privileged_override" value="1" <?php checked( ! empty( $exception_form['is_privileged_override'] ) ); ?>>
+							<?php esc_html_e( 'This exception never expires on its own (skips the expiry-date requirement). Use sparingly.', 'vcns-security-automation-manager' ); ?>
+						</label>
+					</td>
+				</tr>
+			</table>
+			<?php submit_button( __( 'Create exception', 'vcns-security-automation-manager' ) ); ?>
+		</form>
 
 	<?php elseif ( 'updates' === $tab ) : ?>
 
@@ -918,6 +1160,23 @@ $status_badge       = static function ( string $status ): void {
 		<p>
 			<?php esc_html_e( 'This is not a single-purpose plugin -- it manages several largely independent layers under one roof, sharing the same admin, audit log, and reason-required decision workflow:', 'vcns-security-automation-manager' ); ?>
 		</p>
+
+		<?php
+		// Built-in only -- excludes one Custom_Rule_Detector instance per
+		// admin-authored row, which the Traffic Controls bullet below
+		// already covers separately ("plus your own custom ... rules").
+		// Computed live rather than hardcoded so this line can't go stale
+		// again the next time a detector family ships, the way the fixed
+		// "nineteen" this replaced already had.
+		$builtin_detector_count = count(
+			array_filter(
+				Detector_Registry::all(),
+				static fn( $detector ) => 'custom' !== $detector->family()
+			)
+		);
+		?>
+
+		<h3><?php esc_html_e( 'Browser & Header Security', 'vcns-security-automation-manager' ); ?></h3>
 		<ul style="list-style: disc; padding-left: 1.5em;">
 			<li>
 				<strong><?php esc_html_e( 'Content Security Policy', 'vcns-security-automation-manager' ); ?></strong>
@@ -934,22 +1193,46 @@ $status_badge       = static function ( string $status ): void {
 				&nbsp;&mdash;
 				<?php esc_html_e( 'Reverse Tabnabbing Protection, External Scripts (third-party script/stylesheet governance with Subresource Integrity), and Internal Script Integrity, which modify the rendered page itself rather than emit a header.', 'vcns-security-automation-manager' ); ?>
 			</li>
+		</ul>
+
+		<h3><?php esc_html_e( 'Threat Detection & Traffic Control', 'vcns-security-automation-manager' ); ?></h3>
+		<ul style="list-style: disc; padding-left: 1.5em;">
 			<li>
 				<strong><?php esc_html_e( 'Continuous Intelligence', 'vcns-security-automation-manager' ); ?></strong>
 				&nbsp;&mdash;
-				<?php esc_html_e( 'every request is observed and classified against nineteen built-in detectors covering common attack patterns (SQL injection, path traversal, webshell probes, and more), plus your own custom fail2ban-style regex rules. Recognised bots and crawlers are distinguished from unrecognised traffic without ever assuming "bot" means "hostile" -- recognition is never automatic authorisation, and nothing blocks until you configure it to.', 'vcns-security-automation-manager' ); ?>
+				<?php esc_html_e( 'the record behind every detector below: every request is logged, and known bots, crawlers, and scanners are recognised against a maintained vendor catalogue and distinguished from unrecognised traffic, without ever assuming "unrecognised" means "hostile" -- recognition is never automatic authorisation.', 'vcns-security-automation-manager' ); ?>
+			</li>
+			<li>
+				<strong><?php esc_html_e( 'Traffic Controls & Network Intelligence', 'vcns-security-automation-manager' ); ?></strong>
+				&nbsp;&mdash;
+				<?php
+				printf(
+					/* translators: %d: number of built-in attack detectors, computed live */
+					esc_html__( 'rate limiting and progressive response (warn, throttle, temporary block, extended block) per surface; an explicit IP, ASN, and country allow/block list; %d built-in attack detectors (SQL injection, path traversal, webshell probes, credential stuffing, and more) plus your own custom fail2ban-style regex rules; and Tor exit, ASN, Geo-IP, and well-known-file (robots.txt, security.txt, ads.txt, and more) awareness. All observe-only until you explicitly promote a surface to enforce.', 'vcns-security-automation-manager' ),
+					$builtin_detector_count
+				); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- esc_html__() escapes the translated string; %d is an integer.
+				?>
+			</li>
+		</ul>
+
+		<h3><?php esc_html_e( 'Site Integrity & Recovery', 'vcns-security-automation-manager' ); ?></h3>
+		<ul style="list-style: disc; padding-left: 1.5em;">
+			<li>
+				<strong><?php esc_html_e( 'Advanced Intelligence', 'vcns-security-automation-manager' ); ?></strong>
+				&nbsp;&mdash;
+				<?php esc_html_e( 'coordinated-campaign detection across related sources, configurable honeypath decoys that flag any request to a path no legitimate visitor should ever hit, and declared change windows that distinguish an expected deployment from unexplained drift.', 'vcns-security-automation-manager' ); ?>
 			</li>
 			<li>
 				<strong><?php esc_html_e( 'Baseline & Drift', 'vcns-security-automation-manager' ); ?></strong>
 				&nbsp;&mdash;
 				<?php esc_html_e( "snapshots the site's theme, plugin, and core file state, then flags what changed between snapshots -- so an unexpected file modification doesn't go unnoticed between the deployments you actually meant to make.", 'vcns-security-automation-manager' ); ?>
 			</li>
-			<li>
-				<strong><?php esc_html_e( 'Certificates', 'vcns-security-automation-manager' ); ?></strong>
-				&nbsp;&mdash;
-				<?php esc_html_e( 'a free-standing ACME v2 (Let\'s Encrypt) TLS certificate manager: DNS-01 or HTTP-01 issuance, encrypted-at-rest credentials and private keys, and automatic renewal. Unrelated to the pillars above beyond sharing the same admin and audit plumbing.', 'vcns-security-automation-manager' ); ?>
-			</li>
 		</ul>
+
+		<h3><?php esc_html_e( 'Certificates', 'vcns-security-automation-manager' ); ?></h3>
+		<p>
+			<?php esc_html_e( 'A free-standing ACME v2 (Let\'s Encrypt) TLS certificate manager: DNS-01 or HTTP-01 issuance, encrypted-at-rest credentials and private keys, and automatic renewal. Unrelated to the pillars above beyond sharing the same admin and audit plumbing.', 'vcns-security-automation-manager' ); ?>
+		</p>
 
 		<h2><?php esc_html_e( 'The gap this fills', 'vcns-security-automation-manager' ); ?></h2>
 		<p>

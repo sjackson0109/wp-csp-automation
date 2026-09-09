@@ -107,7 +107,7 @@ $current        = $baseline_store->get_current();
 			<?php endforeach; ?>
 		</p>
 
-		<table class="widefat fixed striped wp-sam-violations-table">
+		<table class="widefat fixed striped wp-sam-violations-table wp-sam-drift-table">
 			<thead>
 				<tr>
 					<th><?php esc_html_e( 'Category', 'vcns-security-automation-manager' ); ?></th>
@@ -123,7 +123,7 @@ $current        = $baseline_store->get_current();
 			<?php foreach ( $drifts as $drift ) : ?>
 			<tr>
 				<td><?php echo esc_html( str_replace( '_', ' ', ucfirst( (string) $drift['category'] ) ) ); ?><?php echo '' !== (string) $drift['surface'] ? ' (' . esc_html( ucfirst( (string) $drift['surface'] ) ) . ')' : ''; ?></td>
-				<td><code><?php echo esc_html( (string) $drift['item_key'] ); ?></code></td>
+				<td><code class="wp-sam-drift-item"><?php echo esc_html( (string) $drift['item_key'] ); ?></code></td>
 				<td><?php echo Risk_Badge::render( (string) $drift['risk_level'], (string) $drift['risk_reason'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper escapes internally. ?></td>
 				<td><?php echo esc_html( (string) $drift['correlated_change'] ); ?></td>
 				<td><?php echo esc_html( ucfirst( (string) $drift['disposition'] ) ); ?></td>

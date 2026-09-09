@@ -32,6 +32,10 @@ final class Html_Injection_Detector extends Pattern_Detector {
 		return 'html-injection';
 	}
 
+	public function description(): string {
+		return __( 'Flags script tags, event-handler attributes, and other markup/XSS injection attempts in a request.', 'vcns-security-automation-manager' );
+	}
+
 	public function applicable_surfaces(): array {
 		return array();
 	}

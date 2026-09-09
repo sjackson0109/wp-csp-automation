@@ -43,7 +43,41 @@ class ActivatorTest extends TestCase {
 		$this->assertSame( '', get_option( 'wp_sam_report_endpoint_url' ) );
 	}
 
-	public function test_activate_seeds_direct_reporting_transport(): void {
+	/**
+	 * 'both', not 'report-uri' alone, as of schema v39 -- see
+	 * Activator::migrate_default_reporting_transport_to_both()'s own
+	 * docblock (a report-uri-only default let one unthrottled violation
+	 * storm exhaust a customer's PHP-FPM worker pool in production).
+	 */
+	public function test_activate_seeds_both_reporting_transports_on_a_fresh_install(): void {
+		Activator::activate();
+
+		$this->assertSame( 'both', get_option( 'wp_sam_reporting_transport' ) );
+	}
+
+	public function test_activate_migrates_an_existing_report_uri_only_install_to_both(): void {
+		update_option( 'wp_sam_reporting_transport', 'report-uri' );
+
+		Activator::activate();
+
+		$this->assertSame( 'both', get_option( 'wp_sam_reporting_transport' ) );
+	}
+
+	public function test_activate_does_not_override_an_explicitly_chosen_transport(): void {
+		update_option( 'wp_sam_reporting_transport', 'report-to' );
+
+		Activator::activate();
+
+		$this->assertSame( 'report-to', get_option( 'wp_sam_reporting_transport' ) );
+	}
+
+	public function test_reporting_transport_migration_does_not_reapply_after_an_admin_switches_back(): void {
+		// Simulates: upgrade (migrates to 'both') -> admin deliberately
+		// switches back to 'report-uri' -> some later, unrelated activate()
+		// call (e.g. a future schema bump) must not silently revert it.
+		Activator::activate();
+		update_option( 'wp_sam_reporting_transport', 'report-uri' );
+
 		Activator::activate();
 
 		$this->assertSame( 'report-uri', get_option( 'wp_sam_reporting_transport' ) );
@@ -319,16 +353,37 @@ class ActivatorTest extends TestCase {
 	// ── Scanner vendor catalogue seed (Phase 3D) ──────────────────────────────
 
 	public function test_seed_default_scanner_vendors_inserts_builtin_crawlers_when_missing(): void {
-		$GLOBALS['_wpdb_get_var_queue'] = array_fill( 0, 6, null ); // googlebot, bingbot, ccbot, gptbot, claudebot, perplexitybot all missing.
+		$GLOBALS['_wpdb_get_var_queue'] = array_fill( 0, 16, null ); // all 16 built-in vendors missing.
 
 		$this->invoke_seed_default_scanner_vendors();
 
-		$this->assertCount( 6, $GLOBALS['_wpdb_inserted_rows'] );
+		$this->assertCount( 16, $GLOBALS['_wpdb_inserted_rows'] );
 		$keys = array_column( array_column( $GLOBALS['_wpdb_inserted_rows'], 'data' ), 'vendor_key' );
-		$this->assertSame( array( 'googlebot', 'bingbot', 'ccbot', 'gptbot', 'claudebot', 'perplexitybot' ), $keys );
+		$this->assertSame(
+			array(
+				'googlebot',
+				'bingbot',
+				'ccbot',
+				'gptbot',
+				'claudebot',
+				'perplexitybot',
+				'yandexbot',
+				'baiduspider',
+				'duckduckbot',
+				'applebot',
+				'sogou',
+				'seznambot',
+				'oai-searchbot',
+				'amazonbot',
+				'duckassistbot',
+				'meta-externalagent',
+			),
+			$keys
+		);
 
-		$fcrdns_keys = array( 'googlebot', 'bingbot', 'ccbot' );
-		$cidr_keys   = array( 'gptbot', 'claudebot', 'perplexitybot' );
+		$fcrdns_keys = array( 'googlebot', 'bingbot', 'ccbot', 'yandexbot', 'baiduspider', 'applebot', 'sogou', 'seznambot' );
+		$cidr_keys   = array( 'gptbot', 'claudebot', 'perplexitybot', 'duckduckbot', 'oai-searchbot', 'amazonbot', 'duckassistbot' );
+		$none_keys   = array( 'meta-externalagent' );
 		foreach ( $GLOBALS['_wpdb_inserted_rows'] as $row ) {
 			$this->assertSame( 1, $row['data']['is_builtin'] );
 			$this->assertNotSame( '', $row['data']['source_url'] );
@@ -337,12 +392,14 @@ class ActivatorTest extends TestCase {
 			} elseif ( in_array( $row['data']['vendor_key'], $cidr_keys, true ) ) {
 				$this->assertSame( 'cidr', $row['data']['verification_method'] );
 				$this->assertSame( '[]', $row['data']['cidr_ranges'] );
+			} elseif ( in_array( $row['data']['vendor_key'], $none_keys, true ) ) {
+				$this->assertSame( 'none', $row['data']['verification_method'] );
 			}
 		}
 	}
 
 	public function test_seed_default_scanner_vendors_skips_rows_that_already_exist(): void {
-		$GLOBALS['_wpdb_get_var_queue'] = array_fill( 0, 6, 1 );
+		$GLOBALS['_wpdb_get_var_queue'] = array_fill( 0, 16, 1 );
 
 		$this->invoke_seed_default_scanner_vendors();
 

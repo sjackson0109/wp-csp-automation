@@ -22,6 +22,9 @@ global $wpdb;
 // filter -- a plugin-wide total, not new aggregation logic.
 // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 $pending_sources = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}csp_source_inventory WHERE approval_state = 'pending'" );
+
+// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+$active_exceptions = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}sam_exceptions WHERE review_status = 'active'" );
 ?>
 <div class="wrap wp-sam-wrap">
 	<h1><?php esc_html_e( 'Decide', 'vcns-security-automation-manager' ); ?></h1>
@@ -86,6 +89,32 @@ $pending_sources = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}cs
 				<td>
 					<a href="<?php echo esc_url( admin_url( 'admin.php?page=security-automation-manager-dashboard&tab=policy-audit' ) ); ?>">
 						<?php esc_html_e( 'View Policy Audit', 'vcns-security-automation-manager' ); ?>
+					</a>
+				</td>
+			</tr>
+			<tr>
+				<td>
+					<strong><?php esc_html_e( 'Active Exceptions', 'vcns-security-automation-manager' ); ?></strong>
+					<p class="description"><?php esc_html_e( 'Controlled, time-bound weakenings of a control or surface currently in force.', 'vcns-security-automation-manager' ); ?></p>
+				</td>
+				<td>
+					<?php if ( $active_exceptions > 0 ) : ?>
+						<?php
+						echo esc_html(
+							sprintf(
+								/* translators: %d: number of active exceptions */
+								_n( '%d active exception.', '%d active exceptions.', $active_exceptions, 'vcns-security-automation-manager' ),
+								$active_exceptions
+							)
+						);
+						?>
+					<?php else : ?>
+						<?php esc_html_e( 'No active exceptions.', 'vcns-security-automation-manager' ); ?>
+					<?php endif; ?>
+				</td>
+				<td>
+					<a href="<?php echo esc_url( admin_url( 'admin.php?page=security-automation-manager&tab=exceptions' ) ); ?>">
+						<?php esc_html_e( 'View Exceptions', 'vcns-security-automation-manager' ); ?>
 					</a>
 				</td>
 			</tr>

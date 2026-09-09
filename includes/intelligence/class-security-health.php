@@ -31,6 +31,18 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 final class Security_Health {
 
+	/**
+	 * Bumped whenever the scoring model itself changes shape or principle
+	 * (GitHub issue #175's "version the scoring model, record changes in
+	 * the changelog" requirement) -- not on every row-content tweak. v1 was
+	 * this class's original, unversioned 4-state/8-row model; v2 adds the
+	 * per-surface enforcement breakdown and exception-awareness in
+	 * enforcement_row(), and the formal-exceptions count in
+	 * exceptions_row(), both wiring in real signals GitHub issue #177
+	 * (time-bound exceptions) makes possible for the first time.
+	 */
+	public const MODEL_VERSION = 2;
+
 	private const CERT_EXPIRY_WARNING_DAYS = 14;
 
 	private const SCAN_FRESHNESS_WARNING_HOURS = 48;
@@ -49,23 +61,72 @@ final class Security_Health {
 		);
 	}
 
+	/**
+	 * Per-surface CSP breakdown, and exception-awareness (GitHub issue
+	 * #175's "distinguish intentional exceptions from failures" principle,
+	 * made possible for the first time by #177's real Exception_Store --
+	 * previously there was no exceptions concept to check against). A
+	 * surface not enforcing because it's still learning and one not
+	 * enforcing because an administrator recorded a deliberate, time-bound
+	 * exception for it are different situations; this distinguishes them
+	 * in the value text and the per_surface detail rather than showing
+	 * both identically.
+	 */
 	private function enforcement_row(): array {
 		global $wpdb;
+
+		$surfaces = array( 'frontend', 'admin', 'login', 'api' );
+
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		$csp_enforcing = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}csp_policy_profiles WHERE mode = 'enforce'" );
+		$csp_rows  = $wpdb->get_results( "SELECT surface, mode FROM {$wpdb->prefix}csp_policy_profiles", ARRAY_A );
+		$csp_rows  = ! empty( $csp_rows ) ? $csp_rows : array();
+		$csp_modes = array();
+		foreach ( $csp_rows as $csp_row ) {
+			$csp_modes[ $csp_row['surface'] ] = $csp_row['mode'];
+		}
+
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		$traffic_enforcing = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}sam_traffic_policies WHERE mode = 'enforce'" );
 
+		$exception_store = new Exception_Store();
+		$per_surface     = array();
+		$csp_enforcing   = 0;
+		$exempted        = 0;
+		foreach ( $surfaces as $surface ) {
+			$mode = (string) ( $csp_modes[ $surface ] ?? 'report-only' );
+			if ( 'enforce' === $mode ) {
+				++$csp_enforcing;
+			}
+			$has_exception = 'enforce' !== $mode && $exception_store->has_active_for( 'csp_enforce', $surface );
+			if ( $has_exception ) {
+				++$exempted;
+			}
+			$per_surface[ $surface ] = array(
+				'mode'             => $mode,
+				'exception_active' => $has_exception,
+			);
+		}
+
+		$value = sprintf(
+			/* translators: 1: CSP surfaces enforcing, 2: traffic-control surfaces enforcing */
+			__( 'CSP enforcing on %1$d/4 surfaces, Traffic Controls on %2$d/4', 'vcns-security-automation-manager' ),
+			$csp_enforcing,
+			$traffic_enforcing
+		);
+		if ( $exempted > 0 ) {
+			$value .= ' ' . sprintf(
+				/* translators: %d: number of surfaces with an active, administrator-recorded exception */
+				_n( '(%d exempted via an active exception)', '(%d exempted via active exceptions)', $exempted, 'vcns-security-automation-manager' ),
+				$exempted
+			);
+		}
+
 		return array(
-			'label'  => __( 'Enforcement', 'vcns-security-automation-manager' ),
-			'value'  => sprintf(
-				/* translators: 1: CSP surfaces enforcing, 2: traffic-control surfaces enforcing */
-				__( 'CSP enforcing on %1$d/4 surfaces, Traffic Controls on %2$d/4', 'vcns-security-automation-manager' ),
-				$csp_enforcing,
-				$traffic_enforcing
-			),
-			'status' => ( $csp_enforcing > 0 || $traffic_enforcing > 0 ) ? 'pass' : 'info',
-			'detail' => __( 'A surface stays in report-only/observe mode until an administrator explicitly promotes it -- this is expected on a new install.', 'vcns-security-automation-manager' ),
+			'label'       => __( 'Enforcement', 'vcns-security-automation-manager' ),
+			'value'       => $value,
+			'status'      => ( $csp_enforcing > 0 || $traffic_enforcing > 0 ) ? 'pass' : 'info',
+			'detail'      => __( 'A surface stays in report-only/observe mode until an administrator explicitly promotes it -- this is expected on a new install. A surface marked as exempted has an active, time-bound exception recorded on the Exceptions tab, rather than simply not having been promoted yet.', 'vcns-security-automation-manager' ),
+			'per_surface' => $per_surface,
 		);
 	}
 
@@ -214,8 +275,19 @@ final class Security_Health {
 				$now
 			)
 		);
+		// GitHub issue #177's real, formal exceptions -- counted alongside,
+		// not instead of, the proxy signals above (an IP allow rule isn't
+		// the same statement as a declared, time-bound, justified exception).
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$formal_exceptions = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				"SELECT COUNT(*) FROM {$wpdb->prefix}sam_exceptions WHERE review_status = %s",
+				'active'
+			)
+		);
 
-		$total = $ip_allow + $persistent_blocks + $dep_exceptions + $csp_overrides + $pillar_overrides;
+		$total = $ip_allow + $persistent_blocks + $dep_exceptions + $csp_overrides + $pillar_overrides + $formal_exceptions;
 
 		return array(
 			'label'  => __( 'Exceptions', 'vcns-security-automation-manager' ),
@@ -226,13 +298,14 @@ final class Security_Health {
 			),
 			'status' => 'info',
 			'detail' => sprintf(
-				/* translators: 1: allowed IPs, 2: permanent traffic blocks, 3: dependency exceptions, 4: CSP overrides, 5: pillar overrides */
-				__( 'IP allow rules: %1$d. Permanent traffic blocks: %2$d. Dependency exceptions: %3$d. CSP overrides: %4$d. Header overrides: %5$d.', 'vcns-security-automation-manager' ),
+				/* translators: 1: allowed IPs, 2: permanent traffic blocks, 3: dependency exceptions, 4: CSP overrides, 5: pillar overrides, 6: formal, time-bound exceptions */
+				__( 'IP allow rules: %1$d. Permanent traffic blocks: %2$d. Dependency exceptions: %3$d. CSP overrides: %4$d. Header overrides: %5$d. Formal exceptions (Exceptions tab): %6$d.', 'vcns-security-automation-manager' ),
 				$ip_allow,
 				$persistent_blocks,
 				$dep_exceptions,
 				$csp_overrides,
-				$pillar_overrides
+				$pillar_overrides,
+				$formal_exceptions
 			),
 		);
 	}

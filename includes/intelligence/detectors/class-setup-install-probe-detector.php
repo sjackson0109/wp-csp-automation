@@ -28,6 +28,10 @@ final class Setup_Install_Probe_Detector extends Pattern_Detector {
 		return 'setup-install-probes';
 	}
 
+	public function description(): string {
+		return __( 'Flags requests for installer, setup, and phpinfo()-style diagnostic pages.', 'vcns-security-automation-manager' );
+	}
+
 	public function applicable_surfaces(): array {
 		return array();
 	}

@@ -39,6 +39,7 @@ class Activator {
 		self::migrate_tighten_img_src_default();
 		self::migrate_loosen_media_src_default();
 		self::migrate_consolidate_bypass_flags_into_json();
+		self::migrate_default_reporting_transport_to_both();
 		self::set_default_options();
 		self::seed_default_profiles();
 		self::seed_default_pillar_profiles();
@@ -146,6 +147,36 @@ class Activator {
 				array( '%s' ),
 				array( '%d' )
 			);
+		}
+	}
+
+	/**
+	 * Schema v39: flips an existing install's wp_sam_reporting_transport off
+	 * the original 'report-uri'-only default to 'both' -- see the option's
+	 * own comment in set_default_options() for why. A fresh install never
+	 * needs this: set_default_options() below only ever adds an option that
+	 * doesn't already exist, so a genuinely new site simply gets 'both'
+	 * seeded directly and this method's own get_option() call (default
+	 * false, not 'report-uri') sees nothing to migrate.
+	 *
+	 * Deliberately NOT re-checked on every future activation the way
+	 * migrate_tighten_img_src_default() above is: that migration's condition
+	 * (an exact old hardcoded directive array) can never again match real
+	 * admin intent once changed, but 'report-uri' stays a normal, selectable
+	 * choice in this option's own admin UI after this migration runs --
+	 * an administrator who deliberately switches back to it later must not
+	 * have that choice silently reverted by some unrelated future schema
+	 * bump calling activate() again. Guarded by its own one-time completion
+	 * marker instead.
+	 */
+	private static function migrate_default_reporting_transport_to_both(): void {
+		if ( get_option( 'wp_sam_reporting_transport_defaulted_v39', false ) ) {
+			return;
+		}
+		update_option( 'wp_sam_reporting_transport_defaulted_v39', true );
+
+		if ( 'report-uri' === get_option( 'wp_sam_reporting_transport', false ) ) {
+			update_option( 'wp_sam_reporting_transport', 'both' );
 		}
 	}
 
@@ -301,6 +332,7 @@ class Activator {
 			'sam_detector_policies',
 			'sam_custom_detector_rules',
 			'sam_network_rules',
+			'sam_exceptions',
 		);
 	}
 
@@ -1299,6 +1331,44 @@ class Activator {
 ) {$cc};"
 		);
 
+		// Schema v40: sam_exceptions -- a controlled, time-bound weakening of a
+		// control/surface (GitHub issue #177), the storage half of
+		// Exception_Store. expiry_date is nullable only for a privileged
+		// override (is_privileged_override=1); every ordinary exception
+		// requires one. review_status distinguishes an exception still in
+		// force ('active') from one that has run out ('expired', flipped
+		// automatically by Exception_Scheduler's daily cron) or been
+		// deliberately withdrawn early ('revoked', via revoked_at/
+		// revoked_by). Full history (creation, expiry-date extensions,
+		// revocations) is preserved in sam_audit_log rather than a second
+		// ledger table here -- this table only ever holds current state.
+		dbDelta(
+			"CREATE TABLE {$p}sam_exceptions (
+  id bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+  control varchar(64) NOT NULL,
+  surface varchar(32) NOT NULL DEFAULT '',
+  weaker_value text NOT NULL,
+  business_justification text NOT NULL,
+  technical_justification text NULL,
+  owner varchar(255) NOT NULL,
+  approver varchar(255) NOT NULL DEFAULT '',
+  compensating_control text NULL,
+  risk_classification varchar(16) NOT NULL DEFAULT 'medium',
+  reference varchar(255) NOT NULL DEFAULT '',
+  is_privileged_override tinyint(1) NOT NULL DEFAULT 0,
+  review_status varchar(16) NOT NULL DEFAULT 'active',
+  start_date datetime NOT NULL,
+  expiry_date datetime NULL,
+  revoked_at datetime NULL,
+  revoked_by varchar(255) NULL,
+  created_at datetime NOT NULL,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY  (id),
+  KEY review_status (review_status),
+  KEY control_surface (control, surface)
+) {$cc};"
+		);
+
 		update_option( 'wp_sam_db_version', WP_SAM_DB_VERSION );
 	}
 
@@ -1541,9 +1611,17 @@ class Activator {
 			// Blank uses rest_url( 'sam/v1/report' ); set only when a
 			// public proxy/CDN hostname must be advertised to browsers.
 			'wp_sam_report_endpoint_url'           => '',
-			// Direct report-uri reporting is the default because it gives the
-			// fastest feedback loop for report-endpoint learning.
-			'wp_sam_reporting_transport'           => 'report-uri',
+			// 'both' emits report-uri AND report-to together: a browser that
+			// supports the Reporting API batches violations via report-to and
+			// ignores report-uri; one that doesn't still gets the immediate
+			// report-uri fallback. Direct report-uri alone was the original
+			// default (fastest feedback loop for report-endpoint learning),
+			// but every violation fires its own immediate, unbatched request
+			// -- a user-reported production incident traced an unthrottled
+			// violation storm from exactly this to a customer's PHP-FPM
+			// worker pool being exhausted. See migrate_default_reporting_
+			// transport_to_both() below for the existing-install migration.
+			'wp_sam_reporting_transport'           => 'both',
 			// Blank emits normal CSP headers. Set only when an edge proxy copies
 			// an origin-only policy header back to a browser-facing CSP header.
 			'wp_sam_policy_header_name'            => '',
@@ -1789,6 +1867,45 @@ class Activator {
 	 * (support.claude.com, article 8896518), Common Crawl (commoncrawl.org/
 	 * ccbot), Perplexity (docs.perplexity.ai/guides/bots).
 	 *
+	 * Schema v41 adds ten more, each independently confirmed against the
+	 * vendor's own current documentation (8 September 2026), same two
+	 * verification shapes plus a third for the one vendor that documents
+	 * neither:
+	 * - fcrdns: YandexBot (yandex.com/support/webmaster), Baiduspider
+	 *   (ziyuan.baidu.com, Chinese-language source), Applebot
+	 *   (support.apple.com/en-us/119829 -- Applebot-Extended is a
+	 *   training-use signal carried by this same crawler, not a separate
+	 *   one, so it isn't a separate catalogue row), Sogou web spider
+	 *   (zhanzhang.sogou.com, Chinese-language source), SeznamBot
+	 *   (o-seznam.cz/napoveda).
+	 * - cidr (ranges left empty, same rationale as above): DuckDuckBot
+	 *   (duckduckgo.com/duckduckbot.json), OAI-SearchBot -- OpenAI's
+	 *   separate ChatGPT-search crawler, distinct from GPTBot
+	 *   (openai.com/searchbot.json), Amazonbot (developer.amazon.com/
+	 *   amazonbot/ip-addresses/), DuckAssistBot -- DuckDuckGo's separate
+	 *   AI-answers crawler, distinct from DuckDuckBot
+	 *   (duckduckgo.com/duckassistbot.json).
+	 * - none: Meta-ExternalAgent (developers.facebook.com/docs/sharing/
+	 *   webmasters/web-crawlers) -- Meta documents this user agent but
+	 *   publishes no IP range or reverse-DNS suffix for it, so this entry
+	 *   is honestly recognition-only; traffic claiming this identity
+	 *   resolves to Bot_Classifier's claimed_crawler_unverified state
+	 *   rather than a fabricated verified one.
+	 * Several other researched candidates were deliberately left out of
+	 * this catalogue rather than seeded on partial evidence: Naver
+	 * (Yeti), Mail.RU_Bot, and Bytespider's official documentation pages
+	 * could not be independently confirmed (JS-rendered, geo-blocked, or
+	 * unreachable); PetalBot's own vendor page names two different
+	 * hostname domains for the same claim and wasn't trusted as-is;
+	 * Google-Extended has no HTTP user agent of its own to match against
+	 * (it's a robots.txt-only control token read via the existing
+	 * Googlebot entry). Commercial scanners and monitoring/SEO crawlers
+	 * researched in the same pass (Qualys, Tenable, Ahrefs, etc.) are
+	 * intentionally not built-in rows at all -- see this method's
+	 * existing rationale above; they're catalogued instead in
+	 * docs/scanner-vendor-research.md for an administrator to add
+	 * manually once they have a source they trust.
+	 *
 	 * Idempotent like seed_default_pillar_profiles() above: only inserts a
 	 * vendor_key that doesn't already exist, so an administrator's own edit
 	 * to a built-in row (e.g. adding a verified CIDR range once they have
@@ -1859,6 +1976,106 @@ class Activator {
 				'source_url'          => 'https://www.perplexity.com/perplexitybot.json',
 				'verification_method' => 'cidr',
 				'notes'               => 'Perplexity verifies PerplexityBot by published IP range, not reverse DNS. No ranges are hardcoded here; add current ranges from the source URL above via this form if you want IP-match verification.',
+			),
+			array(
+				'vendor_key'          => 'yandexbot',
+				'vendor_name'         => 'YandexBot',
+				'category'            => 'known_crawler',
+				'ua_pattern'          => 'YandexBot',
+				'rdns_suffixes'       => array( 'yandex.ru', 'yandex.net', 'yandex.com' ),
+				'source_url'          => 'https://yandex.com/support/webmaster/en/robot-workings/check-yandex-robots',
+				'verification_method' => 'fcrdns',
+				'notes'               => "Verify via forward-confirmed reverse DNS against a hostname ending in yandex.ru, yandex.net, or yandex.com, per Yandex's own published verification method.",
+			),
+			array(
+				'vendor_key'          => 'baiduspider',
+				'vendor_name'         => 'Baiduspider',
+				'category'            => 'known_crawler',
+				'ua_pattern'          => 'Baiduspider',
+				'rdns_suffixes'       => array( 'baidu.com', 'baidu.jp' ),
+				'source_url'          => 'https://ziyuan.baidu.com/college/articleinfo?id=1193',
+				'verification_method' => 'fcrdns',
+				'notes'               => "Verify via forward-confirmed reverse DNS against a hostname ending in baidu.com or baidu.jp, per Baidu's own published verification method (Chinese-language source).",
+			),
+			array(
+				'vendor_key'          => 'duckduckbot',
+				'vendor_name'         => 'DuckDuckBot',
+				'category'            => 'known_crawler',
+				'ua_pattern'          => 'DuckDuckBot',
+				'rdns_suffixes'       => array(),
+				'source_url'          => 'https://duckduckgo.com/duckduckbot.json',
+				'verification_method' => 'cidr',
+				'notes'               => 'DuckDuckGo verifies DuckDuckBot by published IP range, not reverse DNS. No ranges are hardcoded here; add current ranges from the source URL above via this form if you want IP-match verification.',
+			),
+			array(
+				'vendor_key'          => 'applebot',
+				'vendor_name'         => 'Applebot (Apple)',
+				'category'            => 'known_crawler',
+				'ua_pattern'          => 'Applebot',
+				'rdns_suffixes'       => array( 'applebot.apple.com' ),
+				'source_url'          => 'https://support.apple.com/en-us/119829',
+				'verification_method' => 'fcrdns',
+				'notes'               => 'Verify via forward-confirmed reverse DNS against a hostname ending in applebot.apple.com (Apple also publishes a CIDR JSON as an alternative). Applebot-Extended is a training-use signal carried by this same crawler, not a separate one -- it uses the identical Applebot/0.1 user agent.',
+			),
+			array(
+				'vendor_key'          => 'sogou',
+				'vendor_name'         => 'Sogou web spider',
+				'category'            => 'known_crawler',
+				'ua_pattern'          => 'Sogou web spider',
+				'rdns_suffixes'       => array( 'sogou.com' ),
+				'source_url'          => 'https://zhanzhang.sogou.com/index.php/help/spider',
+				'verification_method' => 'fcrdns',
+				'notes'               => "Verify via forward-confirmed reverse DNS against a hostname ending in sogou.com, per Sogou's own Resource Platform (Chinese-language source).",
+			),
+			array(
+				'vendor_key'          => 'seznambot',
+				'vendor_name'         => 'SeznamBot',
+				'category'            => 'known_crawler',
+				'ua_pattern'          => 'SeznamBot',
+				'rdns_suffixes'       => array( 'seznam.cz' ),
+				'source_url'          => 'https://o-seznam.cz/napoveda/vyhledavani/en/seznambot-crawler/',
+				'verification_method' => 'fcrdns',
+				'notes'               => 'Verify via forward-confirmed reverse DNS against a hostname ending in seznam.cz. Seznam also publishes fixed IPv4/IPv6 ranges and a JSON list as an alternative.',
+			),
+			array(
+				'vendor_key'          => 'oai-searchbot',
+				'vendor_name'         => 'OAI-SearchBot (OpenAI)',
+				'category'            => 'known_crawler',
+				'ua_pattern'          => 'OAI-SearchBot',
+				'rdns_suffixes'       => array(),
+				'source_url'          => 'https://openai.com/searchbot.json',
+				'verification_method' => 'cidr',
+				'notes'               => "OpenAI's separate crawler for ChatGPT search results (distinct from GPTBot, which is used for training). Verifies by published IP range, not reverse DNS. No ranges are hardcoded here; add current ranges from the source URL above via this form if you want IP-match verification.",
+			),
+			array(
+				'vendor_key'          => 'amazonbot',
+				'vendor_name'         => 'Amazonbot',
+				'category'            => 'known_crawler',
+				'ua_pattern'          => 'Amazonbot',
+				'rdns_suffixes'       => array(),
+				'source_url'          => 'https://developer.amazon.com/amazonbot/ip-addresses/',
+				'verification_method' => 'cidr',
+				'notes'               => "Amazon verifies Amazonbot by published IP range, not reverse DNS -- a *.crawl.amazonbot.amazon reverse-DNS suffix circulates on third-party sites but does not appear on Amazon's own page, so it isn't used here. No ranges are hardcoded here; add current ranges from the source URL above via this form if you want IP-match verification.",
+			),
+			array(
+				'vendor_key'          => 'duckassistbot',
+				'vendor_name'         => 'DuckAssistBot (DuckDuckGo)',
+				'category'            => 'known_crawler',
+				'ua_pattern'          => 'DuckAssistBot',
+				'rdns_suffixes'       => array(),
+				'source_url'          => 'https://duckduckgo.com/duckassistbot.json',
+				'verification_method' => 'cidr',
+				'notes'               => "DuckDuckGo's separate crawler for its AI-assisted answers feature (distinct from DuckDuckBot, which is used for search indexing). Verifies by published IP range, not reverse DNS. No ranges are hardcoded here; add current ranges from the source URL above via this form if you want IP-match verification.",
+			),
+			array(
+				'vendor_key'          => 'meta-externalagent',
+				'vendor_name'         => 'Meta-ExternalAgent (Meta)',
+				'category'            => 'known_crawler',
+				'ua_pattern'          => 'meta-externalagent',
+				'rdns_suffixes'       => array(),
+				'source_url'          => 'https://developers.facebook.com/docs/sharing/webmasters/web-crawlers',
+				'verification_method' => 'none',
+				'notes'               => "Meta's AI-training crawler (distinct from the older facebookexternalhit link-preview fetcher). Meta documents this user agent but does not publish a fixed IP range or reverse-DNS suffix for it -- recognition-only; traffic claiming this identity is correctly shown as unverified rather than confirmed.",
 			),
 		);
 

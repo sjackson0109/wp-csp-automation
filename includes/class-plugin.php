@@ -20,22 +20,30 @@ use WP_SAM\CSP\Policy_Builder;
 use WP_SAM\CSP\Scheduler;
 use WP_SAM\CSP\Violation_Reporter;
 use WP_SAM\Intelligence\Account_Integrity_Recorder;
+use WP_SAM\Intelligence\Agents_Rules_Store;
 use WP_SAM\Intelligence\Asn_Lookup_Store;
 use WP_SAM\Intelligence\Custom_Rule_Store;
 use WP_SAM\Intelligence\Detector_Engine;
 use WP_SAM\Intelligence\Detector_Policy_Store;
 use WP_SAM\Intelligence\Detector_Registry;
+use WP_SAM\Intelligence\Detectors\Ads_Txt_Detector;
+use WP_SAM\Intelligence\Detectors\Agents_Compliance_Detector;
+use WP_SAM\Intelligence\Detectors\Agents_Txt_Detector;
+use WP_SAM\Intelligence\Detectors\App_Ads_Txt_Detector;
 use WP_SAM\Intelligence\Detectors\Custom_Rule_Detector;
 use WP_SAM\Intelligence\Detectors\Header_Consistency_Detector;
 use WP_SAM\Intelligence\Detectors\Honeypath_Detector;
 use WP_SAM\Intelligence\Detectors\Http_Method_Detector;
+use WP_SAM\Intelligence\Detectors\Humans_Txt_Detector;
 use WP_SAM\Intelligence\Detectors\Login_Cookie_Consistency_Detector;
 use WP_SAM\Intelligence\Detectors\Robots_Compliance_Detector;
 use WP_SAM\Intelligence\Detectors\Robots_Txt_Detector;
+use WP_SAM\Intelligence\Detectors\Security_Txt_Detector;
 use WP_SAM\Intelligence\Detectors\Tor_Exit_Detector;
 use WP_SAM\Intelligence\Event_Store;
 use WP_SAM\Intelligence\Change_Attribution_Recorder;
 use WP_SAM\Intelligence\Change_Log_Store;
+use WP_SAM\Intelligence\Exception_Scheduler;
 use WP_SAM\Intelligence\Geo_Ip_Store;
 use WP_SAM\Intelligence\Honeypath_Store;
 use WP_SAM\Intelligence\Identity_Resolver;
@@ -327,6 +335,10 @@ final class Plugin {
 		// WP Cron: daily policy rescan.
 		( new Scheduler( $this->audit ) )->register();
 
+		// WP Cron: daily exception expiry check + upcoming-expiry
+		// notification (GitHub issue #177).
+		( new Exception_Scheduler() )->register();
+
 		// ACME certificate automation: http-01 responder runs on every request
 		// (the CA's validation fetch is an anonymous front-end GET); the
 		// manager, cron hooks, and renewal check ride the same bootstrap.
@@ -404,6 +416,22 @@ final class Plugin {
 		// Detector above. See Robots_Compliance_Detector's own docblock.
 		Detector_Registry::register( new Robots_Compliance_Detector( new Robots_Rules_Store() ) );
 
+		// Well-known-file visit recognition (Phase 4C extension, user-
+		// requested): agents.txt, security.txt, humans.txt, ads.txt, and
+		// app-ads.txt, registered the same way and for the same reason as
+		// Robots_Txt_Detector above -- see each detector's own docblock.
+		// agents.txt is the only one of these five with Disallow-style
+		// directives, so it alone also gets a compliance detector, mirroring
+		// Robots_Compliance_Detector immediately above; security.txt/
+		// humans.txt/ads.txt/app-ads.txt have no such syntax to check
+		// compliance against -- see each store's own docblock.
+		Detector_Registry::register( new Agents_Txt_Detector() );
+		Detector_Registry::register( new Agents_Compliance_Detector( new Agents_Rules_Store() ) );
+		Detector_Registry::register( new Security_Txt_Detector() );
+		Detector_Registry::register( new Humans_Txt_Detector() );
+		Detector_Registry::register( new Ads_Txt_Detector() );
+		Detector_Registry::register( new App_Ads_Txt_Detector() );
+
 		// Custom, admin-authored regex detection rules (Phase 4C extension --
 		// fail2ban-style custom filters): one Custom_Rule_Detector per stored
 		// row, registered fresh every request the same way every detector
@@ -429,12 +457,15 @@ final class Plugin {
 	// ── REST routes ───────────────────────────────────────────────────────────
 
 	public function register_rest_routes(): void {
-		// CSP violation report – public, from browsers.
+		// CSP violation report – public, from browsers. permission_callback
+		// is Violation_Reporter's own early flood check (see its docblock),
+		// not a bare '__return_true' -- a flooding sender is rejected before
+		// handle() ever runs its JSON-decode/DB-upsert work.
 		$violation_reporter = new Violation_Reporter( $this->audit, $this->learning_window );
 		$report_route_args  = array(
 			'methods'             => \WP_REST_Server::CREATABLE,
 			'callback'            => array( $violation_reporter, 'handle' ),
-			'permission_callback' => '__return_true',
+			'permission_callback' => array( $violation_reporter, 'check_not_flooding' ),
 		);
 
 		register_rest_route( 'sam/v1', '/report', $report_route_args );

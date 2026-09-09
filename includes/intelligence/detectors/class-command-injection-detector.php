@@ -29,6 +29,10 @@ final class Command_Injection_Detector extends Pattern_Detector {
 		return 'command-injection';
 	}
 
+	public function description(): string {
+		return __( 'Flags shell command syntax (chained via ;, backticks, $(...), or piped to another command) in a request.', 'vcns-security-automation-manager' );
+	}
+
 	public function applicable_surfaces(): array {
 		return array();
 	}

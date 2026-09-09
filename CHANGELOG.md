@@ -4,6 +4,150 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows semantic versioning for plugin releases.
 
+## [2.9.92] - 2026-09-09
+
+### Fixed
+
+- Baseline & Drift's Drift table (`page-baseline.php`): new `wp-sam-drift-table` CSS class pins Item to 140px and Actions to 200px, leaving Category/Risk/Correlation/Disposition/Details to split the remaining width dynamically instead of inheriting the generic Violations-table defaults. `.wp-sam-drift-item` overrides the site-wide `code { word-break: break-all }` rule with `break-word` so a long item key (a path, a plugin file) wraps at a slash or hyphen instead of mid-word.
+- Advanced Intelligence's Campaigns tab (`page-advanced.php`): consolidated the duplicate Reason input (previously one per form) into a single shared field, mirrored into each form's hidden `note` input on submit via a small addition to `admin.js` -- the two existing admin-post handlers (`wp_sam_campaign_disposition`, `wp_sam_campaign_block`) are unchanged. Added an info-icon popover (matching the existing `wp-sam-meta-icon` pattern) showing the actual currently-live participant IPs, re-queried the same way `block_participants()` itself does rather than trusting the row's stored count. Added explanatory copy stating the real detection criteria, now read from `Campaign_Detector::DEFAULT_MIN_PARTICIPANTS`/`DEFAULT_WINDOW_HOURS` (widened from `private` to `public` so the view isn't duplicating the numbers) instead of leaving an administrator to guess what "many distinct sources" actually means.
+- Continuous Intelligence's Events table (`page-intelligence.php`): the Family column repeats the exact same string as the Detector column for every built-in detector except three (`Custom_Rule_Detector`, `Honeypath_Detector`, `Tor_Exit_Detector`, confirmed by reading every detector's `id()`/`family()` pair) -- it's now collapsed to an em-dash whenever the two are identical, and the Detector column widened to 200px to comfortably fit the longest current detector id without wrapping.
+- Added an `esc_js()` stub to `test/bootstrap.php` -- a pre-existing gap never caught before because no test previously rendered `page-advanced.php` at all. New `test/unit/PageBaselineTest.php` and `test/unit/PageAdvancedTest.php` close that same gap for the Drift and Campaigns tabs respectively.
+
+## [2.9.91] - 2026-09-08
+
+### Fixed
+
+- Traffic Controls > Network Intelligence: the small summary tables on the Tor Exit List, ASN Lookup, Geo-IP, and Well-Known Files sub-tabs (10 instances total, including all six Well-Known files: Robots.txt, Agents.txt, Security.txt, Humans.txt, Ads.txt, App-Ads.txt) used a tall, narrow two-column `<table>` layout, one fact per row, two of them still capped at `max-width:600px`. All 10 now render via a new compact `.wp-sam-stat-row`/`.wp-sam-stat` flex layout (`assets/css/admin.css`) that uses the page's actual width instead of a fixed cap.
+- Confirmed already correct in this branch and left untouched: the Policy tab's `wp-sam-policy-table` (per-surface rows, Save action on the right via the `form=` attribute technique) and the Blocks tab's `wp-sam-blocks-table` (Reason column absorbs the remaining width, Surface pinned small) both already had dedicated, well-considered column-width CSS from earlier work; so does the Network Intelligence sub-tab navigation itself (`wp-sam-subtab-wrapper`, tabs for Tor/ASN/Geo-IP/Well-Known Files/Network Rules). Only the still-narrow stat displays inside those sub-tabs needed fixing.
+
+## [2.9.90] - 2026-09-08
+
+### Added
+
+- Schema v41 (`Activator::seed_default_scanner_vendors()`): 10 more built-in `sam_scanner_vendors` entries -- YandexBot, Baiduspider, DuckDuckBot, Applebot, Sogou web spider, SeznamBot, OAI-SearchBot, Amazonbot, DuckAssistBot, and Meta-ExternalAgent -- bringing the built-in catalogue from 6 to 16. Each independently confirmed against the vendor's own current documentation (8 September 2026): 8 via forward-confirmed reverse DNS or a published CIDR JSON, and Meta-ExternalAgent via `verification_method = 'none'` since Meta documents the user agent but publishes neither an IP range nor a DNS suffix for it -- an honest recognition-only entry rather than a fabricated verified one.
+- New `docs/scanner-vendor-research.md`, linked from Continuous Intelligence > Vendors: full sourcing for the 16 built-ins, plus researched-but-deliberately-not-built-in commercial/research scanners (Qualys, Tenable, Rapid7, Invicti, Acunetix, Detectify, Burp Suite, Intruder.io, Probely, WPScan, Sucuri SiteCheck) and monitoring/SEO/archive bots (UptimeRobot, Pingdom, StatusCake, Censys, Shodan, SecurityTrails, Internet Archive, Ahrefs, Semrush, Majestic, Moz) -- excluded from built-in seeding per `Scanner_Vendor_Store`'s own existing policy (ranges that change over time, or vendors with no distinctive user agent), catalogued instead for an administrator to add manually with a source they trust.
+- A handful of other researched candidates (Naver/Yeti, Mail.RU_Bot, PetalBot, Bytespider, Diffbot, ImagesiftBot, Timpibot, omgili) are documented in the same file as explicitly **not independently verified** -- no reachable vendor-owned page confirmed a formal mechanism -- rather than seeded on secondhand or inconsistent evidence.
+
+## [2.9.89] - 2026-09-08
+
+### Fixed
+
+- Continuous Intelligence Events, Identities, and Vendors tables (`includes/admin/views/page-intelligence.php`) all reused `wp-sam-violations-table`'s `nth-child` column-width rules, which were tuned for the CSP Violations table's own 7-column layout and silently misapplied to these tables' different column counts/orders -- the actual root cause of the reported "awful spacing" (wrapped Family/Classification labels, wrapped dates, a squeezed Claimed Identity/Vendor column). Each table now has its own dedicated width rules (`wp-sam-events-table`, `wp-sam-identities-table`, `wp-sam-vendors-table`) added alongside the shared base class, following the same pattern already used by `wp-sam-profiles-table` and `wp-sam-dependency-inventory-table`.
+- Identities tab: the Reason input in the Decision column is now wider (110px -> 200px), the table now defaults to sorting by Occurrences descending instead of Last Seen, and a `loopback` identity no longer requires a manual Authorise click -- it renders as "Auto-authorised (loopback)" with only a Deny action available, since `Identity_Resolver`'s own docblock already anticipated an administrator overriding loopback recognition on sites where a reverse proxy terminates every visitor's connection via loopback. `Scanner_Identity_Store`'s recognition-is-never-authorisation invariant is untouched -- this is a display-only change; no decision is written to the database unless an admin explicitly denies it.
+- Vendors tab: the "Add a vendor" / "Edit vendor" form is now a `<details>` disclosure (matching the existing Filters pattern on this same page) instead of always being rendered open -- collapsed by default, automatically open when editing an existing vendor via its Edit link.
+
+## [2.9.88] - 2026-09-08
+
+### Added
+
+- Security posture score, evolved in place (GitHub issue #175, per the decision to extend `Security_Health` incrementally rather than build a new aggregation layer): new `Security_Health::MODEL_VERSION` constant (now `2`), shown on the Health tab, satisfying the roadmap's "version the scoring model, record changes in the changelog" requirement -- v1 was the original, unversioned 4-state/8-row model.
+- `enforcement_row()` now reports a per-surface CSP breakdown (`per_surface`: mode + `exception_active` per surface) and distinguishes a surface not enforcing because it's still learning from one not enforcing because of an active, administrator-recorded exception (`Exception_Store::has_active_for('csp_enforce', $surface)`, real since #177) -- directly satisfying "distinguish intentional exceptions from failures," previously impossible with no exceptions concept to check against.
+- `exceptions_row()` now also counts formal, time-bound exceptions (`sam_exceptions` where `review_status = 'active'`) alongside the pre-existing proxy signals (IP allow rules, permanent blocks, dependency exceptions, CSP/header overrides) -- listed alongside, not instead of, those signals, since they remain genuinely different things.
+- The full 11-state-per-control matrix from the original roadmap spec is **not** attempted in this pass -- "evolve in place" is an incremental commitment, not a one-PR completion; issue #175 stays open with this narrower scope recorded against it rather than being closed.
+
+## [2.9.87] - 2026-09-08
+
+### Added
+
+- Per-provider DNS-01 setup guide (GitHub issue #291): new `docs/dns-provider-setup-guides.md` covers all 41 built-in DNS providers -- credential-creation link, minimum permission/scope, zone-scoping guidance, field-by-field mapping from each provider's own naming to this plugin's `fields()` labels, rotation/revocation steps, common errors, and the ToS/Privacy links already disclosed in `readme.txt`. Every entry states its own evidence/verification status (verified live vs. corroborated vs. explicitly flagged "Not independently verified"), matching the same honesty convention `docs/dns-provider-test-matrix.md` already established for test coverage -- no URL, permission name, or UI label was fabricated from memory. Researched 2026-09-08 directly against each provider's own current documentation. New "View setup instructions" link on the Certificates page next to the provider picker.
+- Notable findings surfaced during this research, flagged for follow-up rather than fixed here: Hetzner's legacy DNS Console was shut down in May 2026 (replaced by per-project tokens, still compatible with this plugin's driver); GoDaddy is mid-migration from its classic API Key/Secret model toward Personal Access Tokens ahead of a 2026 deprecation, which may need a driver update later; DNSPod's legacy Token credential (the pair this plugin's driver uses) has no domain-level scoping available at all, a platform limitation rather than a documentation gap.
+- Automated credential and zone-access verification (testing a configured credential can actually reach the right zone before a real issuance attempt) remains explicitly out of scope, per the issue's own "Future" note.
+
+## [2.9.86] - 2026-09-08
+
+### Added
+
+- Compliance evidence pack (GitHub issue #178): `Evidence_Exporter::build()` gains a `checksum` field (SHA-256 over the canonicalized payload minus the checksum itself -- verify by removing the field, re-encoding with `wp_json_encode()`, and re-hashing), an optional `$period` parameter (`from`/`to`, reusing `Table_Query::date_range_where()`'s accepted formats) that bounds the `audit_log_excerpt` section -- the only section that's genuinely history-shaped rather than current-configuration state -- and a new `formal_exceptions` bucket under `exceptions`, reading the real `sam_exceptions` table from #177 alongside the existing proxy signals (IP allow rules, permanent blocks, dependency exceptions, CSP overrides). The Evidence Export form on Settings/Overview gained optional "Reporting period" date inputs. Framework mappings (Cyber Essentials, ISO/IEC 27001, PCI DSS, OWASP ASVS, CIS Controls) were already complete -- confirmed, no work needed there. CSV/HTML export formats remain out of scope for this pass (no `fputcsv`/HTML-report precedent exists anywhere in the codebase to build on).
+
+## [2.9.85] - 2026-09-07
+
+### Added
+
+- Configuration snapshot/restore (GitHub issue #180): `Rollback_Guard::SNAPSHOT_TABLE_SUFFIXES` gains `sam_exceptions` (real since #177), and a new `SNAPSHOT_OPTION_NAMES` constant (`wp_sam_automation_config`) extends `snapshot_before_migration()`/`restore_snapshot()` to also capture and restore configuration-shaped options, not just table rows. New `Rollback_Guard::snapshot_contents()` powers a "Preview what this would overwrite" disclosure on the Recovery tab (row count per table, included options) before an administrator confirms a restore -- the roadmap's "preview the restore" requirement. `restore_snapshot()` now distinguishes a genuine partial restore (a table present in the snapshot's own data but missing from the live database -- an unusual state, not merely an older snapshot predating a newer table) from an unqualified success, surfaced as its own notice on the Recovery tab. `sam_policy_change_decisions` ("approval decisions") and external-verification targets remain deliberately excluded -- documented explicitly in `Rollback_Guard`'s own class docblock and `docs/rollback-and-recovery.md`, along with a correction to `docs/security-controls-inventory.md`'s pre-existing (and already-incorrect before this change) claim that `sam_dependency_inventory` wasn't covered by the snapshot mechanism.
+
+## [2.9.84] - 2026-09-07
+
+### Added
+
+- Promotion gates (GitHub issue #179): `Admin_UI::gate_allows_enforce()` grows from 2 real gates + 1 dead gate to 5 real gates. Gate 3 (previously reading the never-written `csp_policy_profiles.override_expires_at`/`override_owner` columns) is rewired to `Exception_Store::has_active_for('csp_enforce', $surface)`, now that #177 makes exceptions real. Two new gates: no source candidates still `pending` approval for the surface, and no competing CSP header recorded within the last 48 hours (new `Conflict_Detector::has_recent_conflicts()`, reusing the exact signal/window the dashboard's own conflict-notices banner already uses). `ajax_toggle_mode()` now also requires a non-empty `reason` when promoting to `enforce`, logged via `Audit_Log` (`promotion_gate`/`enforce_promoted`) -- the admin.js click handler prompts for one via the existing `requiredReason()` helper before the request is sent. External verification (roadmap §10.3) stays explicitly out of scope, documented in the gate's own code as blocked on #182 (unbuilt).
+
+## [2.9.83] - 2026-09-07
+
+### Added
+
+- Time-bound exceptions (GitHub issue #177): a new `sam_exceptions` table (schema v40) and `Intelligence\Exception_Store` record a controlled, auditable weakening of a control/surface -- required fields are `control`, `weaker_value`, `business_justification`, and `owner`; `expiry_date` is required unless `is_privileged_override` is set. New "Exceptions" tab on Settings/Overview (create, extend with a required reason, revoke immediately with a required reason), modeled on `Custom_Rule_Store`'s CRUD pattern. No hard delete -- an exception is always either `active`, `expired` (flipped automatically), or `revoked`; every creation, extension, and revocation is written to `sam_audit_log` rather than a second history table. `Intelligence\Exception_Scheduler` runs a new daily cron (`wp_sam_exception_check`) that expires overdue exceptions and emails the configured admin address (`wp_sam_notify_email`, falling back to `admin_email`) about exceptions expiring within 7 days. The Decide page gets a new "Active Exceptions" summary row. Added `is_email()`/`wp_mail()` stubs to the test bootstrap to support this.
+
+## [2.9.82] - 2026-09-07
+
+### Fixed
+
+- Closed 3 of the concrete test-coverage gaps identified against GitHub issue #159's 18-scenario release-verification checklist (`GithubUpdateCheckerTest.php`):
+  - Scenario 11 (reject an insecure package URL): `is_allowed_package_url()` already checked `'https' === $scheme`, but no test exercised an `http://` URL specifically -- the only URL-shape test previously covered path traversal, not scheme. Added `test_non_https_download_url_does_not_offer_update()`.
+  - Scenario 17 (expired WordPress transients): the test transient stub has no TTL model at all, so this can only honestly prove what expiry ultimately reduces to at the code level -- `get_transient()` returning `false` (exactly what real WordPress returns once a transient has actually expired) correctly falls through to a fresh `wp_remote_get()`-driven check rather than being mistaken for a cached result. Added `test_a_missing_or_expired_cache_entry_triggers_a_fresh_manifest_fetch()`.
+  - Scenario 18 (cached update metadata): added `test_a_cached_manifest_is_honoured_without_a_fresh_fetch()`, asserting a pre-seeded cache entry is used without any `wp_remote_get()` call occurring.
+  - Scenarios 5/6/7 (WP-UI-triggered upgrade, true background-update integration) remain explicitly out of scope -- they need real WordPress infrastructure beyond what unit tests or `release-verification.yml` currently drive.
+
+## [2.9.81] - 2026-09-07
+
+### Fixed
+
+- `code-review-findings.json` retained 10 findings from an earlier review pass with no disposition metadata at all -- `status`/`issue`/`resolution` fields, no way to tell which had already been fixed by a later issue vs. genuinely still open (GitHub issue #164, closes it). Cross-referenced each against the current codebase: 8 were already resolved by issues #166/#167/#168/#169/#170 or the public package rename; the remaining 2 (both in `test/bootstrap.php`) are fixed directly in this release rather than merely re-documented:
+  - The PSR-4 autoloader is now registered immediately before the `WP_SAM\*` stub requires (`NonceBridge.php`, `Stub_Policy_Data_Loader.php`) instead of at the top of the file, closing the roughly 1,100-line window where a production class could be autoloaded ahead of its stub. It can't move any later than this: `Stub_Policy_Data_Loader.php` implements the real `WP_SAM\CSP\Policy_Data_Loader` interface, so the autoloader must already be active by the time that file loads.
+  - The autoloader's unresolvable-class branch now throws a `RuntimeException` instead of `trigger_error(..., E_USER_NOTICE)`, which PHPUnit does not fail a run on by default -- a genuinely unresolvable class now fails the specific test that touched it immediately instead of silently passing CI.
+  - `WebhookControllerTest.php`'s inline `WP_REST_Request`/`WP_REST_Response` stubs, made redundant once those classes were centralized into `bootstrap.php` for issue #168, are removed as a trivial cleanup.
+
+## [2.9.80] - 2026-09-07
+
+### Fixed
+
+- The CSP dashboard (`page-csp-dashboard.php`) issued four `$wpdb->get_results()` calls unconditionally before any tab-specific branch ran -- policy profiles, the last 50 violations, conflict notices, and the last 20 scan-log rows -- regardless of which tab was actually being viewed (GitHub issue #166). Profiles and violations queries are now gated to only the tabs that read them (`profiles`/`policy-audit` for the former, `violations` for the latter, which already ran its own filtered/paginated re-query); the scan-log query is scoped to the Scan Log tab. Conflict notices remain unconditional, since that query feeds a banner shown on every tab. Added `PageCspDashboardTest::test_start_here_tab_issues_only_the_conflict_notices_query()` and three companion tests asserting exactly which tables each tab does and does not touch, using a new `$GLOBALS['_wpdb_get_results_log']` call-log added to the test `wpdb` stub.
+
+## [2.9.79] - 2026-09-07
+
+### Fixed
+
+- A customer's WP Engine site suffered PHP-FPM worker pool exhaustion (two outages in one morning, verified against the actual installed version, v2.4.14) because the CSP violation-report REST endpoint (`/sam/v1/report`) had no request-level throttle, and the default reporting transport (`report-uri`, `Policy_Builder::REPORTING_TRANSPORT_DIRECT`) fires one immediate, unbatched HTTP request per browser-side violation regardless of CSP mode (report-only and enforce generate identical violation-report traffic). A report-only policy that hadn't yet learned a page's real needs could fire a dozen-plus simultaneous full-bootstrap requests from a single page load.
+- Default reporting transport is now `both` (`report-uri` retained as a fallback for browsers without Reporting API support, `report-to` added so supporting browsers batch violation delivery instead of firing one request per violation). Schema v39 migrates existing installs still on the untouched `report-uri` default via a one-time completion marker, so an administrator who deliberately switches back to `report-uri` later isn't silently reverted by some unrelated future schema bump.
+- New `Violation_Reporter::check_not_flooding()` early per-IP circuit breaker, reusing the existing `Rate_Limiter`/`Ip_Resolver` utilities `Traffic_Guard` already relies on, wired in as the report REST route's own `permission_callback` -- a flooding sender is rejected with a 429 before `handle()`'s JSON-decode/DB-upsert work ever runs. Deliberately separate from and tighter than the existing 500/hour storage cap, which only ever gated what got written to the database, not what got accepted.
+- Corrected `architecture.md`, `security-controls-inventory.md`, `faq.html`, and `database-schema.md`, which documented the old report-uri-only default and the storage cap as sufficient mitigation for "high-volume reports" -- that framing was the blind spot that let this incident happen silently.
+
+Part A of a 4-part remediation; loopback-scan concurrency/timeouts, scan diagnostics, and load-test tooling follow in subsequent releases.
+
+## [2.9.78] - 2026-09-07
+
+### Fixed
+
+- readme.txt's `== Changelog ==` section exceeded WordPress.org's 5,000-word budget for that section -- user-flagged from an SVN import warning banner ("visible only to the plugin authors & committers"): 69 version entries going back to 2.9.9 totalled roughly 6,300 words, past the point the readme parser silently truncates. Trimmed to the most recent 15 releases (2.9.78 down to 2.9.63, ~1,900 words); the pre-existing "Full changelog history" link immediately below them (to this file, on GitHub) already covers every older entry in full, so nothing is actually lost.
+- Added `VersionConsistencyTest::test_readme_changelog_section_is_within_the_wporg_word_budget()`, asserting the section stays under 4,000 words (a real margin below the 5,000-word cap, not right up against it) so a future release pushing it over is caught in CI instead of by another SVN warning.
+
+## [2.9.77] - 2026-09-06
+
+### Added
+
+- Five more well-known files tracked alongside robots.txt in Traffic Controls > Network Intelligence > Well-Known Files: `agents.txt`, `security.txt`, `humans.txt`, `ads.txt`, and `app-ads.txt` (`Agents_Rules_Store`, `Security_Txt_Store`, `Humans_Txt_Store`, `Ads_Txt_Store`, `App_Ads_Txt_Store`), each with its own daily `wp_sam_daily_scan` refresh and manual "Refresh Now" admin action. `agents.txt` also gets `Agents_Compliance_Detector` (a Disallow-rule compliance check, mirroring `Robots_Compliance_Detector`) alongside a visit-recognition detector; the other four get visit-recognition only, since their file formats have no per-path rule to check compliance against.
+- Geo-IP country block/allow grid (Network Intelligence > Geo-IP > Country Block List): every ISO 3166-1 country defaults to Allow, click-to-toggle Block, nothing written until Save. Before writing a newly-blocked country, checks whether it would block the requesting administrator's own current IP (via the same Geo-IP lookup the live request path uses) with no covering `Ip_Rule_Store` allow entry for that surface; if so, the save is held behind an explicit "I understand this may lock me out -- save anyway" confirmation. The same check now also covers the pre-existing generic "Add a network rule" form (country and, via `Asn_Lookup_Store`, ASN rules too) via a shared `Admin_UI::network_rule_lockout_warning()` helper.
+- `Detector::description()` -- a one-line, plain-language explanation of what a detector actually looks for, overridden by all 27 built-in detectors plus `Custom_Rule_Detector`'s dynamic name/pattern fallback -- surfaced as a new Description column on the Detectors tab, alongside a hover tooltip explaining what "(fixed)" means for an observe-only-by-design family.
+
+### Changed
+
+- Traffic Controls > Policy is now a single table (one row per surface) instead of four stacked per-surface forms, matching the CSP Profiles table's look.
+- Traffic Controls > Blocks gets its own `.wp-sam-blocks-table` column-width CSS instead of reusing Violations table widths calibrated for a different layout.
+- Traffic Controls > Network Intelligence is split into Tor Exit List / ASN Lookup / Geo-IP / Well-Known Files / Network Rules sub-tabs, and no longer caps content to 600-700px; the Detectors and Custom Rules tabs' intro paragraphs also no longer cap to 700px.
+- About tab's "What this plugin covers" is regrouped into Browser & Header Security / Threat Detection & Traffic Control / Site Integrity & Recovery / Certificates, and now mentions Traffic Controls & Network Intelligence and Advanced Intelligence, both previously missing entirely despite each having its own top-level nav entry. The built-in-detector count is computed live from `Detector_Registry` instead of a hardcoded number that was already stale before this release.
+- The short "tagline" description (readme.txt and the plugin header's `Description:` field) is updated to "Self-learning security headers, built-in attack detection and rate limiting, file-integrity monitoring, and free TLS certificates. No paywall." (142 characters) -- the previous line, updated only last release, still said nothing about file-integrity monitoring and described rate limiting as "traffic filtering".
+
+### Fixed
+
+- `Traffic_Guard::decide()` no longer lets automatic rate-limit escalation block a loopback address (127.0.0.0/8, `::1`) -- wp-cron's own loopback requests and Site Health's "Loopback request" check were tripping the rate limiter and landing in the Blocks list as if from a remote attacker. An explicit administrator `Ip_Rule_Store` block rule for a loopback address still applies; only automatic escalation is exempted. The loopback CIDR definition is now a single shared `Cidr_Matcher::LOOPBACK_CIDRS` constant, also used by `Identity_Resolver`, instead of two independently-maintained copies.
+- The Geo-IP self-lockout check failed open (silently proceeded with no warning) whenever the Geo-IP lookup for the administrator's own IP returned no country -- an API outage or rate limit that `Geo_Ip_Store` caches for 30 days. It now treats an unresolvable country as its own reason to warn.
+- The self-lockout check only looked for an `Ip_Rule_Store` allow rule scoped to the `admin` surface, even though the country block it was about to write applies to every surface -- an admin-only allow rule could silence the warning while leaving `wp-login.php` itself blocked. It now checks the same surface the new rule would actually apply to.
+- The Geo-IP country grid could silently delete an existing all-surface country rule whose value wasn't one of the bundled ISO codes (e.g. one added via the generic form with a non-standard code) -- it can never render as checked in the grid, so it was always treated as "unchecked" and removed on an unrelated save. The grid now only ever manages rows with a known code.
+- The pending self-lockout warning transient was deleted on every GET render of its tab, including an incidental page reload -- so following the warning's own advice (check the IP Rules tab, then come back) silently discarded it. It is now only cleared by an actual save.
+- A bookmarked or scripted `?lookup_ip=`/`?geo_lookup_ip=` link (valid before Network Intelligence had sub-tabs) silently landed on the wrong sub-tab with the parameter never read, once sub-tabs shipped. The sub-tab now defaults from whichever of those legacy parameters is present.
+- `Agents_Rules_Store::parse()` didn't strip a trailing inline `#` comment before matching `User-agent`/`Disallow` lines, so a comment on a wildcard `User-agent` line silently defeated every `Disallow` rule under it (inherited from `Robots_Rules_Store`, which this store was modelled on, but not otherwise touched here).
+- `is_present()` on `Humans_Txt_Store`, `Security_Txt_Store`, `Ads_Txt_Store`, and `App_Ads_Txt_Store` meant "parsed content is non-empty" rather than "a fetch has ever succeeded" -- a successfully-fetched but empty or unparseable file was indistinguishable from one never fetched at all.
+- Assorted efficiency cleanups from code review: the Geo-IP country-delete loop no longer re-queries `Network_Rule_Store::all()` once per removed country; `Security_Txt_Store` memoizes `fields()` per instance instead of re-reading the same option up to three times per render; submitted country codes are deduplicated before diffing.
+
 ## [2.9.76] - 2026-09-04
 
 ### Fixed
@@ -45,7 +189,7 @@ The format is based on Keep a Changelog, and this project follows semantic versi
 
 ### Added
 
-- Edit action on Continuous Intelligence > Vendors, user-requested after noticing every built-in vendor row's Actions column showed nothing but a bare "—". `Scanner_Vendor_Store::upsert()` already fully supported updating an existing vendor (including a built-in row -- its own class docblock says so explicitly: "Built-in rows... can be edited... but not deleted") without disturbing `is_builtin`, but `page-intelligence.php` never exposed a way to reach that path -- only a hidden-for-built-ins Delete action existed. The "Add a vendor" form now doubles as an edit form when reached via a new per-row Edit link (`?tab=vendors&edit=<vendor_key>`), matching the same pre-fill-and-lock-the-key pattern Custom Rules already uses on Traffic Controls: all fields pre-filled from the existing row, the Key field locked (read-only, since `upsert()` matches on it -- changing it would silently create a new row instead of updating), and the submit button relabels to "Save changes" with a "Cancel" link back to the plain list.
+- Edit action on Continuous Intelligence > Vendors, user-requested after noticing every built-in vendor row's Actions column showed nothing but a bare "-". `Scanner_Vendor_Store::upsert()` already fully supported updating an existing vendor (including a built-in row -- its own class docblock says so explicitly: "Built-in rows... can be edited... but not deleted") without disturbing `is_builtin`, but `page-intelligence.php` never exposed a way to reach that path -- only a hidden-for-built-ins Delete action existed. The "Add a vendor" form now doubles as an edit form when reached via a new per-row Edit link (`?tab=vendors&edit=<vendor_key>`), matching the same pre-fill-and-lock-the-key pattern Custom Rules already uses on Traffic Controls: all fields pre-filled from the existing row, the Key field locked (read-only, since `upsert()` matches on it -- changing it would silently create a new row instead of updating), and the submit button relabels to "Save changes" with a "Cancel" link back to the plain list.
 - Confirmed live in Docker: editing a built-in vendor (Googlebot) through `upsert()` preserves `is_builtin = true` and updates its CIDR ranges/verification notes correctly; the shared Docker verification instance was restored to its original values afterward.
 - No schema change.
 

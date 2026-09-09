@@ -30,6 +30,10 @@ final class Technology_Mismatch_Detector extends Pattern_Detector {
 		return 'technology-mismatch';
 	}
 
+	public function description(): string {
+		return __( 'Flags requests for Joomla, Drupal, Magento, or TYPO3 admin/config paths -- signatures for platforms this site does not run.', 'vcns-security-automation-manager' );
+	}
+
 	public function applicable_surfaces(): array {
 		return array();
 	}

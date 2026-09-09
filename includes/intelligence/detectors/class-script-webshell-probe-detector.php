@@ -32,6 +32,10 @@ final class Script_Webshell_Probe_Detector extends Pattern_Detector {
 		return 'script-webshell-probes';
 	}
 
+	public function description(): string {
+		return __( 'Flags known web-shell filenames and any server-executable script file sitting inside your uploads folder.', 'vcns-security-automation-manager' );
+	}
+
 	public function applicable_surfaces(): array {
 		return array();
 	}

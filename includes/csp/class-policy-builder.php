@@ -332,7 +332,12 @@ class Policy_Builder extends Header_Builder {
 			return $transport;
 		}
 
-		return self::REPORTING_TRANSPORT_DIRECT;
+		// BOTH, not DIRECT: an invalid/corrupt stored value should recover to
+		// the safer default (batched report-to for browsers that support it,
+		// report-uri retained as a fallback for those that don't), not back
+		// to the one-immediate-request-per-violation behaviour a production
+		// incident was traced to.
+		return self::REPORTING_TRANSPORT_BOTH;
 	}
 
 	public static function get_reporting_transport_options(): array {
@@ -352,7 +357,7 @@ class Policy_Builder extends Header_Builder {
 	}
 
 	private function get_reporting_transport(): string {
-		return self::sanitize_reporting_transport( get_option( 'wp_sam_reporting_transport', self::REPORTING_TRANSPORT_DIRECT ) );
+		return self::sanitize_reporting_transport( get_option( 'wp_sam_reporting_transport', self::REPORTING_TRANSPORT_BOTH ) );
 	}
 
 	// ── Policy assembly ───────────────────────────────────────────────────────

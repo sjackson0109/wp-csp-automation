@@ -68,6 +68,40 @@ class PageIntelligenceTest extends TestCase {
 		$this->assertStringNotContainsString( 'tablenav-pages', $output );
 	}
 
+	public function test_events_family_column_shows_the_value_when_it_differs_from_the_detector(): void {
+		$_GET['tab']              = 'events';
+		$GLOBALS['_wpdb_get_var'] = 1;
+		$GLOBALS['_wpdb_get_results_queue'] = array(
+			$this->event_rows( 1, array( 'detector_id' => 'custom_3', 'detector_family' => 'custom' ) ),
+		);
+
+		ob_start();
+		require WP_SAM_DIR . 'includes/admin/views/page-intelligence.php';
+		$output = (string) ob_get_clean();
+
+		unset( $_GET['tab'] );
+
+		$this->assertStringContainsString( 'custom_3', $output );
+		$this->assertStringContainsString( 'custom', $output );
+	}
+
+	public function test_events_family_column_collapses_to_an_em_dash_when_identical_to_the_detector(): void {
+		$_GET['tab']              = 'events';
+		$GLOBALS['_wpdb_get_var'] = 1;
+		$GLOBALS['_wpdb_get_results_queue'] = array(
+			$this->event_rows( 1, array( 'detector_id' => 'header-consistency', 'detector_family' => 'header-consistency' ) ),
+		);
+
+		ob_start();
+		require WP_SAM_DIR . 'includes/admin/views/page-intelligence.php';
+		$output = (string) ob_get_clean();
+
+		unset( $_GET['tab'] );
+
+		$this->assertSame( 1, substr_count( $output, 'header-consistency' ) );
+		$this->assertStringContainsString( '—', $output );
+	}
+
 	// ── Identities tab ──────────────────────────────────────────────────────────
 
 	public function test_identities_pagination_caps_out_of_range_page(): void {
@@ -115,6 +149,40 @@ class PageIntelligenceTest extends TestCase {
 
 		$this->assertStringContainsString( 'No identities recorded yet.', $output );
 		$this->assertStringNotContainsString( 'tablenav-pages', $output );
+	}
+
+	public function test_identities_default_sort_is_occurrences_descending(): void {
+		$_GET['tab']              = 'identities';
+		$GLOBALS['_wpdb_get_var'] = 45;
+		$GLOBALS['_wpdb_get_results_queue'] = array( $this->identity_rows( 20 ) );
+
+		ob_start();
+		require WP_SAM_DIR . 'includes/admin/views/page-intelligence.php';
+		$output = (string) ob_get_clean();
+
+		unset( $_GET['tab'] );
+
+		$this->assertStringContainsString( 'sort=occurrences', $output );
+		$this->assertStringContainsString( 'dir=desc', $output );
+	}
+
+	public function test_identities_loopback_row_is_auto_authorised_without_decision_buttons(): void {
+		$_GET['tab']              = 'identities';
+		$GLOBALS['_wpdb_get_var'] = 1;
+		$GLOBALS['_wpdb_get_results_queue'] = array(
+			array(
+				$this->identity_rows( 1, array( 'verification_state' => 'loopback', 'ip' => '127.0.0.1' ) )[0],
+			),
+		);
+
+		ob_start();
+		require WP_SAM_DIR . 'includes/admin/views/page-intelligence.php';
+		$output = (string) ob_get_clean();
+
+		unset( $_GET['tab'] );
+
+		$this->assertStringContainsString( 'Auto-authorised (loopback)', $output );
+		$this->assertStringNotContainsString( 'value="authorise"', $output );
 	}
 
 	// ── Vendors tab ──────────────────────────────────────────────────────────────
@@ -171,6 +239,21 @@ class PageIntelligenceTest extends TestCase {
 		$this->assertStringContainsString( 'value="Googlebot"', $output );
 		$this->assertStringContainsString( 'Seeded on activation.', $output );
 		$this->assertStringContainsString( 'Delete and re-add under a new key instead.', $output );
+		$this->assertMatchesRegularExpression( '/<details class="wp-sam-filter-form" id="wp-sam-vendor-form"[^>]* open>/', $output );
+	}
+
+	public function test_vendors_add_form_is_collapsed_by_default_when_not_editing(): void {
+		$_GET['tab']                   = 'vendors';
+		$GLOBALS['_wpdb_get_results'] = array();
+
+		ob_start();
+		require WP_SAM_DIR . 'includes/admin/views/page-intelligence.php';
+		$output = (string) ob_get_clean();
+
+		unset( $_GET['tab'] );
+
+		$this->assertStringContainsString( 'Add a vendor', $output );
+		$this->assertDoesNotMatchRegularExpression( '/<details class="wp-sam-filter-form" id="wp-sam-vendor-form"[^>]* open>/', $output );
 	}
 
 	// ── Fixtures ─────────────────────────────────────────────────────────────────
@@ -194,38 +277,50 @@ class PageIntelligenceTest extends TestCase {
 		);
 	}
 
-	/** @return array<int, array<string, mixed>> */
-	private function event_rows( int $count ): array {
+	/**
+	 * @param array<string, mixed> $overrides Applied to every generated row.
+	 * @return array<int, array<string, mixed>>
+	 */
+	private function event_rows( int $count, array $overrides = array() ): array {
 		$rows = array();
 		for ( $i = 1; $i <= $count; $i++ ) {
-			$rows[] = array(
-				'surface'          => 'frontend',
-				'detector_id'      => 'sqli_probe',
-				'detector_family'  => 'injection',
-				'severity'         => 'high',
-				'occurrence_count' => 1,
-				'first_seen_at'    => '2026-01-01 00:00:00',
-				'last_seen_at'     => '2026-01-02 00:00:00',
-				'detail'           => '',
+			$rows[] = array_merge(
+				array(
+					'surface'          => 'frontend',
+					'detector_id'      => 'sqli_probe',
+					'detector_family'  => 'injection',
+					'severity'         => 'high',
+					'occurrence_count' => 1,
+					'first_seen_at'    => '2026-01-01 00:00:00',
+					'last_seen_at'     => '2026-01-02 00:00:00',
+					'detail'           => '',
+				),
+				$overrides
 			);
 		}
 		return $rows;
 	}
 
-	/** @return array<int, array<string, mixed>> */
-	private function identity_rows( int $count ): array {
+	/**
+	 * @param array<string, mixed> $overrides Applied to every generated row.
+	 * @return array<int, array<string, mixed>>
+	 */
+	private function identity_rows( int $count, array $overrides = array() ): array {
 		$rows = array();
 		for ( $i = 1; $i <= $count; $i++ ) {
-			$rows[] = array(
-				'id'                  => $i,
-				'vendor_key'          => '',
-				'verification_state'  => 'unknown',
-				'ip'                  => "203.0.113.{$i}",
-				'surface'             => 'frontend',
-				'claimed_identity'    => '',
-				'occurrence_count'    => 1,
-				'last_seen_at'        => '2026-01-01 00:00:00',
-				'recent_paths'        => '',
+			$rows[] = array_merge(
+				array(
+					'id'                  => $i,
+					'vendor_key'          => '',
+					'verification_state'  => 'unknown',
+					'ip'                  => "203.0.113.{$i}",
+					'surface'             => 'frontend',
+					'claimed_identity'    => '',
+					'occurrence_count'    => 1,
+					'last_seen_at'        => '2026-01-01 00:00:00',
+					'recent_paths'        => '',
+				),
+				$overrides
 			);
 		}
 		return $rows;

@@ -29,6 +29,10 @@ final class Protocol_Injection_Detector extends Pattern_Detector {
 		return 'protocol-injection';
 	}
 
+	public function description(): string {
+		return __( 'Flags php://, file://, and other non-HTTP URI schemes injected as a parameter value.', 'vcns-security-automation-manager' );
+	}
+
 	public function applicable_surfaces(): array {
 		return array();
 	}

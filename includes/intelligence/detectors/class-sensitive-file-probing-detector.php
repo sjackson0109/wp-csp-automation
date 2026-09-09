@@ -34,6 +34,10 @@ final class Sensitive_File_Probing_Detector extends Pattern_Detector {
 		return 'sensitive-files';
 	}
 
+	public function description(): string {
+		return __( 'Flags requests for SSH keys, .env files, AWS credentials, and backup copies of wp-config.php.', 'vcns-security-automation-manager' );
+	}
+
 	public function applicable_surfaces(): array {
 		return array();
 	}
