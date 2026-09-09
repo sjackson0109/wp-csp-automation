@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows semantic versioning for plugin releases.
 
+## [2.9.94] - 2026-09-09
+
+### Added
+
+- Phase 4G UI documentation retrofit, continued: Traffic Controls' Policy, IP Rules, and Blocks tabs gained explainer paragraphs matching the voice established on Settings/Overview (v2.9.67) and the CSP Dashboard (v2.9.69). The Network Intelligence, Detectors, and Custom Rules tabs on this same page already had this level of detail, written when those features originally shipped -- this closes the remaining gap on the page.
+- Policy tab: explains why each surface gets its own rate limit, what Observe vs. Enforce actually changes, and introduces the Warn -> Throttle -> Temporary block -> Extended block progressive ladder that the Blocks tab's Stage column and the Detectors tab's enforce-capable detectors both feed into -- previously only mentioned on the Detectors tab, never where the mode is actually set.
+- IP Rules tab: explains when to use Allow vs. Block, what a CIDR range is with a concrete worked example (`203.0.113.0/24` covers 256 addresses), and cross-references Network Rules (Network Intelligence tab) as the equivalent decision by ASN/country instead of by address.
+- Blocks tab: explains that this tab shows only what automatic detection has already done, what the Stage column means, and what Release vs. Make Permanent each actually change (Make Permanent converts an auto-expiring block into the functional equivalent of a manual IP Rules entry).
+- No behaviour change -- `<p class="description">` copy only. Confirmed live in Docker: all three tabs render without error via a real WordPress bootstrap (`wp-load.php` plus `wp-admin/includes/template.php` for `submit_button()`), with the new text present in the output.
+
 ## [2.9.93] - 2026-09-09
 
 ### Added
