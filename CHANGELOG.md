@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows semantic versioning for plugin releases.
 
+## [2.9.97] - 2026-09-10
+
+### Added
+
+- Phase 4G UI documentation retrofit, public-docs track completed: `docs/user-guide.html` and `docs/faq.html` (the GitHub Pages help site) now explain what Content Security Policy actually defends against -- cross-site scripting -- rather than only describing rollout mechanics. `docs/index.html` already had this from an earlier increment (v2.9.70); the other two pages never once mentioned XSS despite it being the entire reason CSP exists.
+- `docs/user-guide.html`: added a paragraph at the top of "First 30 minutes" (the first thing a reader hits) explaining the XSS threat model and framing the rollout steps that follow as building a safe allowlist against it. The three callouts from an earlier pass (HSTS stickiness, COOP/COEP breakage risk, Reverse Tabnabbing phishing mechanics) were re-verified intact and left unchanged.
+- `docs/faq.html`: enriched 8 of ~50 answers with a concrete-consequence sentence each, selected for reach and mechanism-relevance rather than attempting all of them -- what the plugin does (XSS framing), why one policy doesn't fit the whole site, what actually breaks in enforce mode (a silently-failing checkout iframe example), why wp-admin is the highest lockout risk, what a wildcard/unsafe keyword actually costs, the motive behind report spoofing, why `'unsafe-inline'` specifically undoes CSP, and the stale-nonce mechanism behind full-page-cache incompatibility (confirmed against `Nonce_Manager::generate()`'s actual per-request behavior).
+- `test/unit/VersionConsistencyTest.php`'s guarded exact-substring assertions (WP/PHP minimum-version wording, the subscription price) were confirmed untouched by these edits -- verified via `composer test:no-coverage -- --filter VersionConsistencyTest` (12 tests, 100 assertions, passing) both by the drafting agent and independently by me before shipping.
+- No behaviour change -- static HTML copy only.
+
 ## [2.9.96] - 2026-09-10
 
 ### Added
