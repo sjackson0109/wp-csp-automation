@@ -768,7 +768,7 @@ class Admin_UI {
 			X_Frame_Options_Builder::PILLAR_KEY,
 			__( 'X-Frame-Options', 'vcns-security-automation-manager' ),
 			'X-Frame-Options',
-			'<p>' . esc_html__( 'Controls whether this site may be embedded in a frame or iframe on another site, as a defense against clickjacking. CSP\'s frame-ancestors directive supersedes this header in browsers that support it; X-Frame-Options remains a fallback for older browsers that don\'t.', 'vcns-security-automation-manager' ) . '</p>',
+			'<p>' . esc_html__( 'Controls whether this site may be embedded in a frame or iframe on another site, as a defense against clickjacking -- an attack that hides this site inside an invisible frame on another page, so a visitor who thinks they are clicking something on that page is actually clicking a button or link on this site underneath. CSP\'s frame-ancestors directive supersedes this header in browsers that support it; X-Frame-Options remains a fallback for older browsers that don\'t.', 'vcns-security-automation-manager' ) . '</p>',
 			array(
 				'DENY'       => __( 'DENY -- never allow framing', 'vcns-security-automation-manager' ),
 				'SAMEORIGIN' => __( 'SAMEORIGIN -- allow framing only by pages on this same site', 'vcns-security-automation-manager' ),
@@ -781,7 +781,7 @@ class Admin_UI {
 			X_Content_Type_Options_Builder::PILLAR_KEY,
 			__( 'X-Content-Type-Options', 'vcns-security-automation-manager' ),
 			'X-Content-Type-Options',
-			'<p>' . esc_html__( 'Stops browsers from guessing ("MIME-sniffing") a response\'s content type away from what the server declared, closing off a class of content-sniffing attacks. nosniff is the only defined value for this header, so each surface is simply on or off.', 'vcns-security-automation-manager' ) . '</p>',
+			'<p>' . esc_html__( 'Stops browsers from guessing ("MIME-sniffing") a response\'s content type away from what the server declared. Without it, a browser can decide on its own that a response is actually HTML or a script -- based on what its content looks like, not the type the server sent -- and run it as code; a classic case is a file a visitor uploads (an image, a document) that gets served back and executed instead of staying inert data. nosniff is the only defined value for this header, so each surface is simply on or off.', 'vcns-security-automation-manager' ) . '</p>',
 			null
 		);
 	}

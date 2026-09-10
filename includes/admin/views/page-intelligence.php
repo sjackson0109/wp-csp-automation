@@ -57,7 +57,7 @@ $tab_help = array(
 	<h1><?php esc_html_e( 'Continuous Intelligence', 'vcns-security-automation-manager' ); ?></h1>
 
 	<p>
-		<?php esc_html_e( 'Layer 3 of this plugin\'s protection model: request observation and classification, independent of the enforced header policies above.', 'vcns-security-automation-manager' ); ?>
+		<?php esc_html_e( 'Layer 3 of this plugin\'s protection model: request observation and classification, independent of the enforced header policies above. Which detector families run, and whether a match stays pure evidence or feeds progressive blocking, is configured on Traffic Controls\' Detectors tab -- this page is where you read what they\'ve actually found, who\'s making the requests, and the vendor catalogue those identities are checked against.', 'vcns-security-automation-manager' ); ?>
 	</p>
 
 	<nav class="nav-tab-wrapper wp-sam-tab-wrapper" role="tablist" aria-label="<?php esc_attr_e( 'Continuous Intelligence sections', 'vcns-security-automation-manager' ); ?>">
@@ -180,6 +180,10 @@ $tab_help = array(
 
 		$detector_count = count( \WP_SAM\Intelligence\Detector_Registry::keys() );
 		?>
+
+		<p class="description">
+			<?php esc_html_e( 'Each row is a Finding -- evidence that a registered detector matched something about a request, not a log of every individual hit. Repeated matches from the same source against the same detector on the same surface collapse into one row: Occurrences counts how many times it happened, and First Seen/Last Seen bracket when. A row here is never, by itself, proof that anything was blocked -- whether this detector\'s matches stay pure evidence or actually feed the progressive-response block ladder is a per-family setting on Traffic Controls\' Detectors tab. Use the icon in the Details column to see the specific evidence captured for a row.', 'vcns-security-automation-manager' ); ?>
+		</p>
 
 		<?php if ( 0 === $detector_count ) : ?>
 		<div class="notice notice-info inline" style="padding:12px 16px;margin:1em 0;">
@@ -437,6 +441,14 @@ $tab_help = array(
 			</p>
 		</div>
 
+		<p class="description">
+			<?php esc_html_e( 'State reflects this plugin\'s own automatic recognition -- Unknown, one of three known-vendor categories, or Loopback -- refreshed on every request, unless an administrator\'s own decision (Authorised, Denied, or Authorisation expired) already occupies that row; a decision always wins and is never silently overwritten by new automatic traffic from the same source. Classification adds a further judgement computed fresh on every page load, purely for display -- nothing it produces is written back to the database, which is also why, unlike State, it has no sort or filter of its own here.', 'vcns-security-automation-manager' ); ?>
+		</p>
+
+		<p class="description">
+			<?php esc_html_e( 'A claimed identity only becomes Verified crawler once it also matches that vendor\'s own published network data -- a CIDR range or reverse-DNS suffix recorded on the Vendors tab. Claimed crawler (unverified) means the User-Agent string alone claims a known vendor\'s identity without that match: exactly the impersonation case worth a closer look, since a User-Agent is just a header any script can set to anything it likes. Enumerating (sequential ID pattern) and Aggressive / rate-escalated both describe an unrecognised source instead -- the first from a fixed-step pattern in its recent request paths (e.g. /product/101, /product/102, /product/103), the second from having already escalated through Traffic Controls\' own progressive-response ladder. Neither implies the other, and most ordinary traffic triggers neither, landing on Unclassified.', 'vcns-security-automation-manager' ); ?>
+		</p>
+
 		<details class="wp-sam-filter-form">
 			<summary><?php esc_html_e( 'Filters', 'vcns-security-automation-manager' ); ?></summary>
 			<form method="get" action="">
@@ -586,6 +598,10 @@ $tab_help = array(
 		$edit_vendor_key = isset( $_GET['edit'] ) ? sanitize_key( wp_unslash( $_GET['edit'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		$editing_vendor  = '' !== $edit_vendor_key ? $vendor_store->get( $edit_vendor_key ) : null;
 		?>
+
+		<p class="description">
+			<?php esc_html_e( 'This is the catalogue this plugin checks a request\'s User-Agent against -- a match here is what turns an anonymous request into a claimed identity on the Identities tab at all. Verification method controls how much that match is actually worth: "None" means the User-Agent string is the entire signal, which is worth very little on its own since it\'s trivially spoofed; "Published CIDR ranges" and "Forward-confirmed reverse DNS" let a claimed identity be checked against network data the vendor itself publishes, which is what promotes a match from Claimed crawler (unverified) to Verified crawler on the Identities tab. Built-in rows ship with only a small, deliberately conservative seed of well-documented crawlers -- commercial scanner vendors are never seeded with guessed network ranges, since asserting a stale or fabricated range in a security product would be worse than asserting none. Add your own vendor once you have network data you trust, with its source recorded.', 'vcns-security-automation-manager' ); ?>
+		</p>
 
 		<p class="description">
 			<a href="https://github.com/vcns/security-automation-manager/blob/main/docs/scanner-vendor-research.md" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Vendor research: sourcing for every built-in entry, plus researched-but-not-built-in commercial scanners and monitoring bots', 'vcns-security-automation-manager' ); ?></a>
