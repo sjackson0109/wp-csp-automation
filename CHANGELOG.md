@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows semantic versioning for plugin releases.
 
+## [2.9.95] - 2026-09-10
+
+### Fixed
+
+- `.roadmap/phase4_plan.md`'s note on the Traffic Controls retrofit (v2.9.94) described the page's other recent growth (Network Intelligence's new ASN/Geo-IP/Well-Known-Files/Network-Rules sub-tabs, landed via other work on `development`) as "unrelated work." User-corrected: that work was explicitly requested, not unrelated -- it just wasn't tracked in this document's own increment list. Reworded to attribute it correctly. Documentation only, no behaviour change.
+
 ## [2.9.94] - 2026-09-09
 
 ### Added
