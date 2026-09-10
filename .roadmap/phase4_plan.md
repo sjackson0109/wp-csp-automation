@@ -155,7 +155,7 @@ Lowest priority in this document, deliberately -- §22's own text and the origin
 
 ## Phase 4G: UI Documentation Retrofit and Guided Onboarding
 
-**Status: Admin-UI retrofit and public-docs retrofit both fully delivered (v2.9.67-v2.9.97, 4-10 September 2026). Remaining: the guided onboarding/getting-started flow (not yet started).**
+**Status: Fully delivered (v2.9.67-v2.9.98, 4-10 September 2026). Admin-UI retrofit, public-docs retrofit, and the guided onboarding flow are all shipped. Phase 4G is complete.**
 
 **Addresses:** a direct user request, not tied to any numbered section in `.roadmap/phase3_early_plan.md` -- the admin UI covers a subject area "few technicians know the full domain of, and even more people know absolutely nothing about at all," and needs UI text that actually teaches, not just labels. User confirmed via clarifying question: retrofit existing pages first, then build a separate guided onboarding/getting-started flow.
 
@@ -178,8 +178,9 @@ Lowest priority in this document, deliberately -- §22's own text and the origin
   - **Two real, previously-undocumented gaps surfaced and now explained in the UI itself (not silently fixed -- both are pre-existing behavior, confirmed against current code):** (1) Reverse Tabnabbing Protection and External Script Integrity share `Content_Rewriter`'s exclusion gate -- their Admin/Login/Api rows are configurable but structurally never take effect, only Frontend is live for either. (2) Cross-Origin-Opener-Policy and Cross-Origin-Embedder-Policy ship pre-enabled in Enforce mode on every surface but at the no-op `unsafe-none` value (confirmed in `class-activator.php`'s seeding logic) -- enough to satisfy a scanner's presence check, not providing real isolation until a stronger value is deliberately chosen.
   - **One dead-enum finding, flagged for a product decision, not resolved here:** `Scanner_Identity_Store::AUTOMATIC_STATES` declares an `identity_conflict` state, exposed in the Identities tab's own State filter dropdown, that `Identity_Resolver::resolve()` never actually returns anywhere in the current codebase. Either implement the signal it was reserved for, or remove the dead value -- a human call, not made here.
 
-**Admin-UI retrofit and public-docs retrofit: both complete.** Remaining for this phase:
-- The guided onboarding/getting-started flow (deliberately sequenced after both retrofits above) -- no design work done yet.
+- **Guided onboarding flow (v2.9.98)** -- a new "Getting Started" tab on Settings/Overview, positioned right after Overview. A five-step, suggested-order checklist (Configure CSP, turn on the other header pillars, review Traffic Controls, capture a security baseline, issue a free TLS certificate -- marked optional) with a live status per step, read from the same store each relevant page itself reads from (no new state persisted, no dismiss/hide mechanism -- purely a read-only reflection of actual configuration, matching the Overview tab's own Layer 1-5 tables). A short note explains Continuous Intelligence needs no setup step of its own since it's already observing by default. `test/unit/PageOverviewTest.php` (new, 3 tests) is the first test coverage this admin page has ever had.
+
+**Phase 4G: fully complete.** Admin-UI retrofit, public-docs retrofit, and the guided onboarding flow are all shipped.
 
 ---
 

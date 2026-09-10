@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows semantic versioning for plugin releases.
 
+## [2.9.98] - 2026-09-10
+
+### Added
+
+- Phase 4G guided onboarding flow: a new "Getting Started" tab on Settings/Overview (`includes/admin/views/page-overview.php`), the last piece of the Phase 4G UI documentation retrofit. Positioned as the second tab, right after Overview.
+- A five-step, suggested-order checklist for a new install: Configure Content Security Policy, turn on the other header pillars, review Traffic Controls (and consider Enforce mode), capture a security baseline, and issue a free TLS certificate (marked optional -- many hosts already provide HTTPS another way). A short note explains that Continuous Intelligence needs no setup step of its own, since it's already observing every request by default.
+- Each step's status is read live from the same store the relevant admin page itself reads from -- a `csp_policy_profiles` mode count for CSP, `Pillar_Registry::fetch_rows()` for the other pillars, `Traffic_Policy_Store::all()` for Traffic Controls, `Baseline_Store::get_current()` for Baseline & Drift, `Certificate_Store::latest_certificate()` for Certificates -- rather than a static list. No new state is persisted; nothing here is required, and there is no dismiss/hide mechanism to build or maintain -- the checklist simply reflects whatever is actually configured on every page load, matching this plugin's existing read-only status-display pattern (the Overview tab's own Layer 1-5 tables).
+- `test/unit/PageOverviewTest.php` (new, 3 tests) -- the first test coverage this admin page has ever had. Covers the not-started state, the fully-done state (all five signals present), and that every other Overview-page tab still renders and links to the new tab.
+- No behaviour change to any existing control -- this tab only reads and displays state, it never writes to it.
+- Confirmed live in Docker: all 8 existing Overview-page tabs (Overview, Getting Started, Security Health, Readiness, Recovery, Exceptions, Updates, About) render without error; the Getting Started tab correctly showed a mix of done/not-done states on a long-running test site with real configured data (CSP active, pillars enabled, and a baseline already captured, but Traffic Controls still Observe-only and no certificate issued).
+
 ## [2.9.97] - 2026-09-10
 
 ### Added
