@@ -3,7 +3,7 @@
  * Plugin Name:       VCNS Security Automation Manager
  * Plugin URI:        https://github.com/vcns/security-automation-manager
  * Description:       Self-learning security headers, built-in attack detection and rate limiting, file-integrity monitoring, and free TLS certificates. No paywall.
- * Version:           2.9.99
+ * Version:           2.9.100
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            VCNS Tech Ltd
@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // ── Core constants ────────────────────────────────────────────────────────────
-define( 'WP_SAM_VERSION', '2.9.99' );
+define( 'WP_SAM_VERSION', '2.9.100' );
 
 /**
  * Schema version. Increment whenever a database schema change is made.
@@ -283,8 +283,20 @@ define( 'WP_SAM_VERSION', '2.9.99' );
  *        opportunistically as soon as any of its requests does trigger a
  *        finding. See Intelligence\Scanner_Identity_Store::record() and
  *        Intelligence\Request_Observer.
+ *   v43: adds recent_seen_at to sam_scanner_identities (Phase 4C carried-
+ *        forward item -- the "timing" signal §10's own signal list names,
+ *        never built). Bounded JSON array (Scanner_Identity_Store::
+ *        MAX_RECENT_PATHS, oldest dropped first) of this identity's recent
+ *        request timestamps, appended in lockstep with the existing
+ *        recent_paths on every record() call. Read by the new Request_
+ *        Timing_Analyzer, wired into Bot_Classifier as a third signal for
+ *        an unrecognised source (alongside URI-pattern enumeration and
+ *        rate escalation): a new 'scripted_timing' classification state
+ *        when the last several requests arrived at a suspiciously uniform
+ *        interval, distinct from enumeration (which is about *what* a
+ *        source requests; this is about *when*).
  */
-define( 'WP_SAM_DB_VERSION', '42' );
+define( 'WP_SAM_DB_VERSION', '43' );
 
 define( 'WP_SAM_FILE', __FILE__ );
 define( 'WP_SAM_DIR', plugin_dir_path( __FILE__ ) );

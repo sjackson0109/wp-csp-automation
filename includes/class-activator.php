@@ -924,6 +924,10 @@ class Activator {
 		// trips a detector costs nothing extra. See Scanner_Identity_Store::
 		// record() for the COALESCE-based upsert that never overwrites an
 		// already-known value with a null one.
+		// recent_seen_at (schema v43, Phase 4C carried-forward item -- the
+		// "timing" signal §10's own list names): bounded JSON array of this
+		// identity's last MAX_RECENT_PATHS request timestamps, appended in
+		// lockstep with recent_paths. See Request_Timing_Analyzer.
 		dbDelta(
 			"CREATE TABLE {$p}sam_scanner_identities (
   id bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -945,6 +949,7 @@ class Activator {
   first_seen_at datetime NOT NULL,
   last_seen_at datetime NOT NULL,
   recent_paths longtext NOT NULL,
+  recent_seen_at longtext NOT NULL,
   asn int(10) UNSIGNED DEFAULT NULL,
   asn_org varchar(255) NOT NULL DEFAULT '',
   geo_country varchar(8) NOT NULL DEFAULT '',

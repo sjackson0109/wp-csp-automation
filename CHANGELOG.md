@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows semantic versioning for plugin releases.
 
+## [2.9.100] - 2026-09-11
+
+### Added
+
+- Phase 4C carried-forward item closed: the "timing" signal §10's own signal list names, alongside "repeated errors" (still open -- needs a new response-status hook, tracked separately). `sam_scanner_identities` (schema v43) gains `recent_seen_at`, a bounded JSON array of this identity's recent request timestamps, appended in lockstep with the existing `recent_paths` on every `Scanner_Identity_Store::record()` call (same `MAX_RECENT_PATHS` bound, same index alignment).
+- New `Intelligence\Request_Timing_Analyzer` (mirrors `Uri_Pattern_Analyzer` exactly: pure, read-only, takes already-recorded history, returns a bool): `is_scripted_timing()` flags a run of at least 4 consecutive intervals whose coefficient of variation is at or below 0.15 (real browsing varies far more than this) and whose mean is under 5 minutes (a longer average cadence is ordinary infrequent traffic, not a timing signal, even if incidentally uniform).
+- `Bot_Classifier` gains a third signal for an unrecognised source (alongside URI-pattern enumeration, checked first, and rate escalation, checked last): a new `scripted_timing` classification state, shown on the Identities tab as "Scripted timing (uniform request interval)". Distinct from enumeration -- one is about *what* a source requests, this is about *when* -- so a source can be flagged for either independently.
+- 16 new tests across `RequestTimingAnalyzerTest` (new), `BotClassifierTest`, and `ScannerIdentityStoreTest`.
+- No behaviour change to detection or blocking -- purely a new read-only classification signal, computed on demand the same way the existing enumeration/rate signals already are.
+
 ## [2.9.99] - 2026-09-11
 
 ### Added
