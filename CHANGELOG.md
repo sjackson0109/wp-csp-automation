@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows semantic versioning for plugin releases.
 
+## [2.9.99] - 2026-09-11
+
+### Added
+
+- Phase 4A carried-forward item closed: `sam_scanner_identities` (schema v42) gains `asn`, `asn_org`, `geo_country`, `geo_region`, `geo_city` columns. ASN/Geo-IP were already resolved and recorded in `sam_request_events` evidence per-request, but never merged onto the identity record itself -- an admin reviewing the Identities tab had no way to see a source's network context without cross-referencing individual Events rows.
+- `Request_Observer::observe()` reordered: `Network_Intelligence_Resolver::resolve()` now runs (still gated on `!empty($findings)`, unchanged from before) *before* `Scanner_Identity_Store::record()` instead of after, so the same lazily-resolved result is reused for both the per-event evidence and the identity record -- no new resolution, no new cost, no change to when the lazy resolve itself happens.
+- `Scanner_Identity_Store::record()` gains five new optional trailing parameters (`asn`, `asn_org`, `geo_country`, `geo_region`, `geo_city`, all nullable, all defaulting to `null`) and upserts them via `COALESCE`/`NULLIF` on both write paths (the decision-state bookkeeping-only path and the normal `INSERT ... ON DUPLICATE KEY UPDATE` path) so a null/empty incoming value never overwrites an already-known one -- a source's identity only ever fills in over time, never flickers back to unknown.
+- The Identities admin tab (Continuous Intelligence) shows the ASN and country under a source's IP whenever recorded, with an explainer noting a blank line usually just means that source has never yet tripped a detector, not a failed lookup.
+- 8 new tests across `ScannerIdentityStoreTest`, `RequestObserverTest`, and `PageIntelligenceTest` covering the new columns' persistence, the reorder, and the admin display.
+
+### Fixed
+
+- Caught during live-Docker verification against a real database, not assumed: `wpdb::prepare()` does **not** preserve a PHP `null` as SQL `NULL` for `%d`/`%s` placeholders -- confirmed directly (`$wpdb->prepare("SELECT %d, %s", null, null)` returns `SELECT 0, ''`, not `SELECT NULL, NULL`). The initial `COALESCE(VALUES(asn), asn)` upsert therefore always "won" with `0` instead of falling back to the existing value. Fixed by using `0` (never a valid real-world ASN) as the sentinel via `NULLIF(..., 0)`, matching the pattern already used for the string columns via `NULLIF(..., '')`.
+- **Flagged, not fixed -- pre-existing, out of scope for this change:** the same `wpdb::prepare()` behavior means `sam_scanner_identities.network_match` (`tinyint(1) DEFAULT NULL`, shipped well before this release) can never actually store a real `NULL` either -- confirmed live: 0 rows with `network_match IS NULL`, several with `network_match = 0`. Every "unknown" case has silently been recorded as "confirmed not matching" since this column was introduced. Not touched here since fixing it is a behavior change to already-shipped data semantics that needs its own deliberate look at what (if anything) currently depends on the distinction, not a side effect of this release.
+
+No behaviour change to detection or blocking -- purely additive data on the identity record.
+
 ## [2.9.98] - 2026-09-10
 
 ### Added

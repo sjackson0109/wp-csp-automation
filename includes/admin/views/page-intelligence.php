@@ -449,6 +449,10 @@ $tab_help = array(
 			<?php esc_html_e( 'A claimed identity only becomes Verified crawler once it also matches that vendor\'s own published network data -- a CIDR range or reverse-DNS suffix recorded on the Vendors tab. Claimed crawler (unverified) means the User-Agent string alone claims a known vendor\'s identity without that match: exactly the impersonation case worth a closer look, since a User-Agent is just a header any script can set to anything it likes. Enumerating (sequential ID pattern) and Aggressive / rate-escalated both describe an unrecognised source instead -- the first from a fixed-step pattern in its recent request paths (e.g. /product/101, /product/102, /product/103), the second from having already escalated through Traffic Controls\' own progressive-response ladder. Neither implies the other, and most ordinary traffic triggers neither, landing on Unclassified.', 'vcns-security-automation-manager' ); ?>
 		</p>
 
+		<p class="description">
+			<?php esc_html_e( "The ASN/country line under an IP (when shown) fills in the same way State does -- only once a detector has already found something about that source, reusing that same lookup rather than resolving network data for every ordinary visitor. A blank line isn't a failed lookup; it usually just means this source has never yet tripped a detector. See Traffic Controls' Network Intelligence tab for what ASN and Geo-IP actually are and how they're resolved.", 'vcns-security-automation-manager' ); ?>
+		</p>
+
 		<details class="wp-sam-filter-form">
 			<summary><?php esc_html_e( 'Filters', 'vcns-security-automation-manager' ); ?></summary>
 			<form method="get" action="">
@@ -512,7 +516,20 @@ $tab_help = array(
 				?>
 			<tr>
 				<td><?php echo esc_html( '' !== (string) $row['claimed_identity'] ? (string) $row['claimed_identity'] : __( '(unrecognised)', 'vcns-security-automation-manager' ) ); ?></td>
-				<td><code><?php echo esc_html( (string) $row['ip'] ); ?></code></td>
+				<td>
+					<code><?php echo esc_html( (string) $row['ip'] ); ?></code>
+					<?php
+					$network_bits = array_filter(
+						array(
+							'' !== (string) ( $row['asn'] ?? '' ) ? 'AS' . (string) $row['asn'] . ( '' !== (string) ( $row['asn_org'] ?? '' ) ? ' (' . (string) $row['asn_org'] . ')' : '' ) : '',
+							(string) ( $row['geo_country'] ?? '' ),
+						)
+					);
+					?>
+					<?php if ( ! empty( $network_bits ) ) : ?>
+						<br /><small class="description"><?php echo esc_html( implode( ' -- ', $network_bits ) ); ?></small>
+					<?php endif; ?>
+				</td>
 				<td><?php echo esc_html( ucfirst( (string) $row['surface'] ) ); ?></td>
 				<td>
 					<?php if ( null !== $vendor && '' !== (string) $vendor['source_url'] ) : ?>

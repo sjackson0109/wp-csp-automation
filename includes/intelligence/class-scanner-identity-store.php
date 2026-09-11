@@ -29,6 +29,19 @@
  * enumerating access (e.g. /product/101, /product/102, /product/103) as
  * its own signal, and to answer §10's "log the fact they're hitting the
  * endpoint" plainly on the Identities admin view.
+ *
+ * asn/asn_org/geo_country/geo_region/geo_city (schema v42, Phase 4A
+ * carried-forward item) are optional -- record() only receives them on a
+ * request where Network_Intelligence_Resolver was already resolved (i.e.
+ * some detector already produced a finding this request; see Request_
+ * Observer's own §33 performance gate, unchanged by this). A null value
+ * passed here never overwrites an already-known value -- see the
+ * COALESCE-based upsert below -- so an identity's network fields only
+ * ever fill in over time, never flicker back to unknown. Confirmed
+ * directly against a live install: wpdb::prepare() does NOT preserve a
+ * PHP null as SQL NULL for %d/%s -- it casts to 0/'' -- so the upsert
+ * treats 0 (asn) and '' (the rest) as the "unknown" sentinel via NULLIF,
+ * rather than relying on a real NULL ever reaching the query.
  */
 
 declare( strict_types=1 );
@@ -63,7 +76,12 @@ final class Scanner_Identity_Store {
 		string $surface,
 		string $verification_state,
 		?bool $network_match,
-		string $path = ''
+		string $path = '',
+		?int $asn = null,
+		?string $asn_org = null,
+		?string $geo_country = null,
+		?string $geo_region = null,
+		?string $geo_city = null
 	): void {
 		global $wpdb;
 		$table = $wpdb->prefix . 'sam_scanner_identities';
@@ -94,13 +112,31 @@ final class Scanner_Identity_Store {
 
 		if ( is_string( $existing_state ) && in_array( $existing_state, self::DECISION_STATES, true ) ) {
 			// wpdb::update() can't express `occurrence_count = occurrence_count + 1`, so this is a direct query.
+			// COALESCE/NULLIF: a null/empty incoming network-intelligence value
+			// never overwrites an already-known one -- see class docblock.
+			// NULLIF(..., 0) rather than relying on wpdb::prepare() preserving
+			// a PHP null as SQL NULL for %d -- it doesn't; %d casts null to
+			// the integer 0 (confirmed directly against a live install, not
+			// assumed), so 0 is used as the "no value" sentinel instead. Safe
+			// because a real ASN is never 0.
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			$wpdb->query(
 				$wpdb->prepare(
 					// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-					"UPDATE {$table} SET occurrence_count = occurrence_count + 1, last_seen_at = %s, recent_paths = %s WHERE fingerprint = %s",
+					"UPDATE {$table} SET occurrence_count = occurrence_count + 1, last_seen_at = %s, recent_paths = %s,
+						asn = COALESCE(NULLIF(%d, 0), asn),
+						asn_org = COALESCE(NULLIF(%s, ''), asn_org),
+						geo_country = COALESCE(NULLIF(%s, ''), geo_country),
+						geo_region = COALESCE(NULLIF(%s, ''), geo_region),
+						geo_city = COALESCE(NULLIF(%s, ''), geo_city)
+					WHERE fingerprint = %s",
 					$now,
 					$recent_paths,
+					$asn ?? 0,
+					$asn_org ?? '',
+					$geo_country ?? '',
+					$geo_region ?? '',
+					$geo_city ?? '',
 					$fingerprint
 				)
 			);
@@ -113,17 +149,24 @@ final class Scanner_Identity_Store {
 				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 				"INSERT INTO {$table} (
 					ip, claimed_identity, user_agent, vendor_key, surface, verification_state,
-					network_match, fingerprint, occurrence_count, first_seen_at, last_seen_at, recent_paths
+					network_match, fingerprint, occurrence_count, first_seen_at, last_seen_at, recent_paths,
+					asn, asn_org, geo_country, geo_region, geo_city
 				) VALUES (
 					%s, %s, %s, %s, %s, %s,
-					%s, %s, %d, %s, %s, %s
+					%s, %s, %d, %s, %s, %s,
+					%d, %s, %s, %s, %s
 				) ON DUPLICATE KEY UPDATE
 					occurrence_count = occurrence_count + 1,
 					last_seen_at = VALUES(last_seen_at),
 					user_agent = VALUES(user_agent),
 					verification_state = VALUES(verification_state),
 					network_match = VALUES(network_match),
-					recent_paths = VALUES(recent_paths)",
+					recent_paths = VALUES(recent_paths),
+					asn = COALESCE(NULLIF(VALUES(asn), 0), asn),
+					asn_org = COALESCE(NULLIF(VALUES(asn_org), ''), asn_org),
+					geo_country = COALESCE(NULLIF(VALUES(geo_country), ''), geo_country),
+					geo_region = COALESCE(NULLIF(VALUES(geo_region), ''), geo_region),
+					geo_city = COALESCE(NULLIF(VALUES(geo_city), ''), geo_city)",
 				$ip,
 				substr( $claimed_identity, 0, 128 ),
 				substr( $user_agent, 0, 512 ),
@@ -135,7 +178,12 @@ final class Scanner_Identity_Store {
 				1,
 				$now,
 				$now,
-				$recent_paths
+				$recent_paths,
+				$asn ?? 0,
+				$asn_org ?? '',
+				$geo_country ?? '',
+				$geo_region ?? '',
+				$geo_city ?? ''
 			)
 		);
 	}

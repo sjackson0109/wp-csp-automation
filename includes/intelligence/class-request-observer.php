@@ -41,13 +41,17 @@
  * docblock for why this write path can never set a decision state.
  *
  * Network intelligence (Phase 4A, Network_Intelligence_Resolver -- Tor
- * exit status today, ASN/Geo-IP later) is resolved only when a detector
- * has actually produced a Finding, not on every request -- unlike identity
- * resolution above, which every request needs for the scanner-recognition
- * feature to work at all, network-fact enrichment is only ever consumed
- * as extra context on evidence that already exists, so skipping it on the
+ * exit status, ASN, Geo-IP) is resolved only when a detector has actually
+ * produced a Finding, not on every request -- unlike identity resolution
+ * above, which every request needs for the scanner-recognition feature to
+ * work at all, network-fact enrichment is only ever consumed as extra
+ * context on evidence that already exists, so skipping it on the
  * overwhelming majority of benign requests is a genuine, safe cost saving,
- * not a feature gap.
+ * not a feature gap. Since schema v42 (Phase 4A carried-forward item),
+ * when this resolution does happen it's also passed to Scanner_Identity_
+ * Store::record() so the identity's own asn/geo columns fill in the same
+ * lazy, opportunistic way Event_Store's per-event evidence already does --
+ * no new resolution, no new cost, just reusing a result already computed.
  *
  * Detector-family-aware control actions (Phase 4B, .roadmap/phase4_plan.md):
  * each Finding already carries its resolved 'control_action' (Detector_
@@ -142,6 +146,15 @@ final class Request_Observer {
 
 		$findings = $this->engine->evaluate( $context );
 
+		// Resolved before identity recording (schema v42) so a repeat
+		// offender's identity row can be enriched with the exact same
+		// result Event_Store's evidence gets below -- still gated on
+		// $findings, so this changes nothing about when the lazy resolve
+		// itself happens, only what its result is reused for.
+		if ( ! empty( $findings ) && '' !== $context['ip'] ) {
+			$context['network'] = $this->network_intelligence->resolve( $context['ip'] );
+		}
+
 		if ( null !== $identity && '' !== $context['ip'] ) {
 			$this->identities->record(
 				$context['ip'],
@@ -151,12 +164,13 @@ final class Request_Observer {
 				$context['surface'],
 				$identity['verification_state'],
 				$identity['network_match'],
-				$context['path']
+				$context['path'],
+				$context['network']['asn'] ?? null,
+				$context['network']['asn_org'] ?? null,
+				$context['network']['country'] ?? null,
+				$context['network']['region'] ?? null,
+				$context['network']['city'] ?? null
 			);
-		}
-
-		if ( ! empty( $findings ) && '' !== $context['ip'] ) {
-			$context['network'] = $this->network_intelligence->resolve( $context['ip'] );
 		}
 
 		foreach ( $findings as $finding ) {
