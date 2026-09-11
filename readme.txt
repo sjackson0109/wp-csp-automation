@@ -4,7 +4,7 @@ Tags: security, csp, content security policy, hsts, ssl certificates
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 2.9.98
+Stable tag: 2.9.99
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -114,6 +114,11 @@ The remaining three DNS-01 drivers (acme-dns, PowerDNS, and RFC 2136 dynamic DNS
 When an administrator configures automatic cPanel deployment, once a certificate is successfully issued the plugin sends an HTTPS request to the cPanel host the administrator specifies (cPanel's UAPI SSL::install_ssl endpoint), containing: the cPanel account username and API token supplied by the administrator (as an Authorization header); the domain name; the issued certificate; the certificate chain; and the certificate's private key. This is the one automatic-deployment method that transmits the private key itself, since installing a certificate requires it. Nothing is sent unless cPanel deployment is explicitly configured, and it happens once per issuance or renewal, immediately after the certificate is issued. Because the endpoint is the administrator's own hosting provider, not a service this plugin operates or has a relationship with, no single Terms of Service or Privacy Policy governs it -- those are whatever the administrator's own hosting provider publishes for their account and API access.
 
 == Changelog ==
+
+= 2.9.99 =
+
+* Added: Continuous Intelligence's Identities table now persists ASN and Geo-IP (country/region/city) directly on the identity record, not just as per-event evidence. This was a known gap: ASN/Geo-IP were already resolved and recorded against individual detector findings, but never merged onto the identity itself. Populated only when that resolution was already happening anyway (a detector already found something on that request), so this adds no extra cost to ordinary traffic -- a repeat source's identity fills in the network details over time as it keeps triggering findings.
+* Fixed: a real bug found in live testing, not shipped before release -- WordPress's own `wpdb::prepare()` doesn't preserve a blank value as a true database NULL for number/text placeholders, so the first version of this feature's "don't overwrite what we already know" logic could have reset a source's ASN back to blank on a later request with no new data. Fixed before release.
 
 = 2.9.98 =
 

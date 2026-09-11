@@ -228,6 +228,38 @@ class RequestObserverTest extends TestCase {
 		$this->assertStringContainsString( addslashes( '"is_tor_exit":false' ), $event_queries[0] );
 	}
 
+	/**
+	 * Schema v42, Phase 4A carried-forward item: when a finding triggers
+	 * network-intelligence resolution anyway, its result is now also passed
+	 * to Scanner_Identity_Store::record() -- not just Event_Store. Proves
+	 * the reorder in observe() actually wires this through.
+	 */
+	public function test_observe_persists_asn_onto_the_identity_record_when_a_finding_triggers_resolution(): void {
+		Detector_Registry::register( new Observer_Fixture_Detector() );
+		$GLOBALS['_wpdb_get_var'] = null; // Not a Tor exit.
+		// Ordered queue, not the flat fallback: get_row() is also called
+		// twice by Detector_Policy_Store -- once from is_enabled(), once
+		// (separately, not cached) from control_action_for() -- ahead of
+		// Asn_Lookup_Store's own cache check and Scanner_Identity_Store's
+		// existing-row check. A flat fallback here would make the fixture
+		// detector look disabled (an ASN-shaped row has neither
+		// 'is_enabled' nor 'control_action' keys) and findings would never
+		// happen at all.
+		$GLOBALS['_wpdb_get_row_queue'] = array(
+			null, // Detector_Policy_Store::is_enabled('observer-fixture') -- no override row.
+			null, // Detector_Policy_Store::control_action_for(...) -- likewise.
+			array( 'asn' => '15169', 'asn_org' => 'Google LLC' ), // Asn_Lookup_Store cache hit.
+			null, // Scanner_Identity_Store::record()'s own existing-row check.
+		);
+
+		$this->observer->observe();
+
+		$identity_queries = $this->identity_queries();
+		$this->assertCount( 1, $identity_queries );
+		$this->assertStringContainsString( '15169', $identity_queries[0] );
+		$this->assertStringContainsString( "'Google LLC'", $identity_queries[0] );
+	}
+
 	public function test_observe_never_queries_the_tor_list_when_nothing_matched(): void {
 		// No detector registered -- findings is always empty, so the Tor
 		// lookup must never run at all (performance requirement: don't pay

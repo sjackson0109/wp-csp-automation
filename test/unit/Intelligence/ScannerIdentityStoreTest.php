@@ -152,6 +152,49 @@ class ScannerIdentityStoreTest extends TestCase {
 		$this->assertStringContainsString( "'[]'", $GLOBALS['_wpdb_queries'][0] );
 	}
 
+	// ── asn/asn_org/geo_* (schema v42, Phase 4A carried-forward item) ───────
+
+	public function test_record_persists_network_fields_when_provided_on_first_insert(): void {
+		$GLOBALS['_wpdb_get_row'] = null;
+
+		$this->store->record( '203.0.113.42', 'Googlebot', 'ua', 'googlebot', 'frontend', 'known_crawler', true, '', 15169, 'Google LLC', 'US', 'California', 'Mountain View' );
+
+		$query = $GLOBALS['_wpdb_queries'][0];
+		$this->assertStringContainsString( '15169', $query );
+		$this->assertStringContainsString( "'Google LLC'", $query );
+		$this->assertStringContainsString( "'US'", $query );
+		$this->assertStringContainsString( "'California'", $query );
+		$this->assertStringContainsString( "'Mountain View'", $query );
+	}
+
+	public function test_record_insert_path_never_overwrites_network_fields_with_a_null_value(): void {
+		$GLOBALS['_wpdb_get_row'] = null;
+
+		$this->store->record( '203.0.113.42', 'Googlebot', 'ua', 'googlebot', 'frontend', 'known_crawler', true );
+
+		// No detector finding this request => no network resolution => these
+		// arguments default to null -- the ON DUPLICATE KEY UPDATE clause must
+		// still guard with COALESCE/NULLIF so a *later* row with real data
+		// isn't clobbered back to unknown on a subsequent request that has none.
+		$query = $GLOBALS['_wpdb_queries'][0];
+		$this->assertStringContainsString( 'asn = COALESCE(NULLIF(VALUES(asn), 0), asn)', $query );
+		$this->assertStringContainsString( "asn_org = COALESCE(NULLIF(VALUES(asn_org), ''), asn_org)", $query );
+		$this->assertStringContainsString( "geo_country = COALESCE(NULLIF(VALUES(geo_country), ''), geo_country)", $query );
+	}
+
+	public function test_record_decision_state_path_also_updates_network_fields_via_coalesce(): void {
+		$GLOBALS['_wpdb_get_row'] = array( 'verification_state' => 'customer_authorised', 'recent_paths' => '[]' );
+
+		$this->store->record( '203.0.113.42', 'Qualys', 'ua', 'qualys', 'frontend', 'known_commercial_scanner', true, '', 12345, 'Some ISP', 'GB' );
+
+		$query = $GLOBALS['_wpdb_queries'][0];
+		// Still must not touch verification_state -- an admin decision stands.
+		$this->assertStringNotContainsString( 'verification_state', $query );
+		$this->assertStringContainsString( 'asn = COALESCE(', $query );
+		$this->assertStringContainsString( "'Some ISP'", $query );
+		$this->assertStringContainsString( "'GB'", $query );
+	}
+
 	public function test_authorise_requires_a_non_empty_note(): void {
 		$this->assertFalse( $this->store->authorise( 1, 5, '' ) );
 		$this->assertFalse( $this->store->authorise( 1, 5, '   ' ) );

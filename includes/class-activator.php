@@ -916,6 +916,14 @@ class Activator {
 		// identity's last Scanner_Identity_Store::MAX_RECENT_PATHS request
 		// paths, oldest first. See that class's own docblock and Uri_
 		// Pattern_Analyzer.
+		// asn/asn_org/geo_country/geo_region/geo_city (schema v42, Phase 4A
+		// carried-forward item): populated only when Network_Intelligence_
+		// Resolver has already been resolved for this request (i.e. some
+		// detector already found something) -- same lazy gate Event_Store's
+		// per-event evidence already uses, so a benign identity that never
+		// trips a detector costs nothing extra. See Scanner_Identity_Store::
+		// record() for the COALESCE-based upsert that never overwrites an
+		// already-known value with a null one.
 		dbDelta(
 			"CREATE TABLE {$p}sam_scanner_identities (
   id bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -937,11 +945,17 @@ class Activator {
   first_seen_at datetime NOT NULL,
   last_seen_at datetime NOT NULL,
   recent_paths longtext NOT NULL,
+  asn int(10) UNSIGNED DEFAULT NULL,
+  asn_org varchar(255) NOT NULL DEFAULT '',
+  geo_country varchar(8) NOT NULL DEFAULT '',
+  geo_region varchar(128) NOT NULL DEFAULT '',
+  geo_city varchar(128) NOT NULL DEFAULT '',
   PRIMARY KEY  (id),
   KEY ip (ip),
   KEY vendor_key (vendor_key),
   KEY verification_state (verification_state),
   KEY last_seen_at (last_seen_at),
+  KEY asn (asn),
   UNIQUE KEY fingerprint (fingerprint)
 ) {$cc};"
 		);

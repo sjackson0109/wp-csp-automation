@@ -3,7 +3,7 @@
  * Plugin Name:       VCNS Security Automation Manager
  * Plugin URI:        https://github.com/vcns/security-automation-manager
  * Description:       Self-learning security headers, built-in attack detection and rate limiting, file-integrity monitoring, and free TLS certificates. No paywall.
- * Version:           2.9.98
+ * Version:           2.9.99
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            VCNS Tech Ltd
@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // ── Core constants ────────────────────────────────────────────────────────────
-define( 'WP_SAM_VERSION', '2.9.98' );
+define( 'WP_SAM_VERSION', '2.9.99' );
 
 /**
  * Schema version. Increment whenever a database schema change is made.
@@ -270,8 +270,21 @@ define( 'WP_SAM_VERSION', '2.9.98' );
  *        DuckDuckBot, Applebot, Sogou web spider, SeznamBot,
  *        OAI-SearchBot, Amazonbot, DuckAssistBot, and Meta-ExternalAgent.
  *        See seed_default_scanner_vendors()'s own docblock for sourcing.
+ *   v42: adds asn, asn_org, geo_country, geo_region, geo_city to
+ *        sam_scanner_identities (Phase 4A carried-forward item -- ASN was
+ *        resolved and recorded in Event_Store evidence per-request but
+ *        never merged onto the identity record itself). Populated the same
+ *        way Event_Store's evidence already is: Network_Intelligence_
+ *        Resolver::resolve() only runs when at least one detector already
+ *        produced a finding this request (Request_Observer's existing
+ *        §33 performance gate, unchanged) -- so an identity that never
+ *        triggers a detector keeps these columns null, same zero-added-
+ *        cost guarantee as before, and a repeat offender's row fills in
+ *        opportunistically as soon as any of its requests does trigger a
+ *        finding. See Intelligence\Scanner_Identity_Store::record() and
+ *        Intelligence\Request_Observer.
  */
-define( 'WP_SAM_DB_VERSION', '41' );
+define( 'WP_SAM_DB_VERSION', '42' );
 
 define( 'WP_SAM_FILE', __FILE__ );
 define( 'WP_SAM_DIR', plugin_dir_path( __FILE__ ) );
