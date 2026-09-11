@@ -152,6 +152,63 @@ class ScannerIdentityStoreTest extends TestCase {
 		$this->assertStringContainsString( "'[]'", $GLOBALS['_wpdb_queries'][0] );
 	}
 
+	// ── recent_seen_at (schema v43, Phase 4C carried-forward item -- timing) ─
+
+	public function test_record_appends_a_timestamp_on_first_insert(): void {
+		$GLOBALS['_wpdb_get_row'] = null;
+
+		$this->store->record( '203.0.113.42', 'Googlebot', 'ua', 'googlebot', 'frontend', 'known_crawler', true, '/product/101' );
+
+		// current_time( 'mysql', true ) is whatever "now" resolves to in the
+		// stub -- just prove a single-entry JSON timestamp array landed
+		// (the same escaped-quote shape recent_paths' own single entry
+		// already uses), rather than pin an exact, time-dependent value.
+		$this->assertMatchesRegularExpression( '/\[\\\\"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\\\\"\]/', $GLOBALS['_wpdb_queries'][0] );
+		$this->assertStringContainsString( 'recent_seen_at = VALUES(recent_seen_at)', $GLOBALS['_wpdb_queries'][0] );
+	}
+
+	public function test_record_appends_to_existing_recent_seen_at(): void {
+		$GLOBALS['_wpdb_get_row'] = array(
+			'verification_state' => 'known_crawler',
+			'recent_paths'       => wp_json_encode( array( '/product/101' ) ),
+			'recent_seen_at'     => wp_json_encode( array( '2026-01-01 00:00:00' ) ),
+		);
+
+		$this->store->record( '203.0.113.42', 'Googlebot', 'ua', 'googlebot', 'frontend', 'known_crawler', true, '/product/102' );
+
+		$this->assertStringContainsString( addslashes( '2026-01-01 00:00:00' ), $GLOBALS['_wpdb_queries'][0] );
+	}
+
+	public function test_record_trims_recent_seen_at_to_the_configured_maximum(): void {
+		$existing = array();
+		for ( $i = 1; $i <= Scanner_Identity_Store::MAX_RECENT_PATHS; $i++ ) {
+			$existing[] = sprintf( '2026-01-01 00:00:%02d', $i );
+		}
+		$GLOBALS['_wpdb_get_row'] = array(
+			'verification_state' => 'known_crawler',
+			'recent_paths'       => '[]',
+			'recent_seen_at'     => wp_json_encode( $existing ),
+		);
+
+		$this->store->record( '203.0.113.42', 'Googlebot', 'ua', 'googlebot', 'frontend', 'known_crawler', true );
+
+		// Oldest entry (...:01) dropped to make room for the new one.
+		$this->assertStringNotContainsString( addslashes( '2026-01-01 00:00:01' ), $GLOBALS['_wpdb_queries'][0] );
+		$this->assertStringContainsString( addslashes( '2026-01-01 00:00:10' ), $GLOBALS['_wpdb_queries'][0] );
+	}
+
+	public function test_record_still_appends_a_timestamp_when_a_decision_state_blocks_the_verification_state_update(): void {
+		$GLOBALS['_wpdb_get_row'] = array(
+			'verification_state' => 'customer_authorised',
+			'recent_paths'       => '[]',
+			'recent_seen_at'     => '[]',
+		);
+
+		$this->store->record( '203.0.113.42', 'Qualys', 'ua', 'qualys', 'frontend', 'known_commercial_scanner', true, '/scan-target' );
+
+		$this->assertStringContainsString( 'recent_seen_at', $GLOBALS['_wpdb_queries'][0] );
+	}
+
 	// ── asn/asn_org/geo_* (schema v42, Phase 4A carried-forward item) ───────
 
 	public function test_record_persists_network_fields_when_provided_on_first_insert(): void {

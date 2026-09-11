@@ -30,6 +30,15 @@
  * its own signal, and to answer §10's "log the fact they're hitting the
  * endpoint" plainly on the Identities admin view.
  *
+ * recent_seen_at (schema v43, Phase 4C carried-forward item -- the
+ * "timing" signal §10's own list names) holds this identity's last
+ * MAX_RECENT_PATHS request timestamps as a JSON array, oldest first,
+ * appended in lockstep with recent_paths on every record() call (so the
+ * two stay index-aligned). Read by Request_Timing_Analyzer to recognise
+ * suspiciously uniform inter-request intervals -- the timing signature of
+ * a scripted client sleeping a fixed duration between requests, rather
+ * than a person's naturally irregular browsing.
+ *
  * asn/asn_org/geo_country/geo_region/geo_city (schema v42, Phase 4A
  * carried-forward item) are optional -- record() only receives them on a
  * request where Network_Intelligence_Resolver was already resolved (i.e.
@@ -106,9 +115,10 @@ final class Scanner_Identity_Store {
 		$now = current_time( 'mysql', true );
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		$existing       = $wpdb->get_row( $wpdb->prepare( "SELECT verification_state, recent_paths FROM {$table} WHERE fingerprint = %s", $fingerprint ), ARRAY_A );
+		$existing       = $wpdb->get_row( $wpdb->prepare( "SELECT verification_state, recent_paths, recent_seen_at FROM {$table} WHERE fingerprint = %s", $fingerprint ), ARRAY_A );
 		$existing_state = is_array( $existing ) ? (string) ( $existing['verification_state'] ?? '' ) : null;
 		$recent_paths   = $this->append_recent_path( is_array( $existing ) ? (string) ( $existing['recent_paths'] ?? '' ) : '', $path );
+		$recent_seen_at = $this->append_recent_timestamp( is_array( $existing ) ? (string) ( $existing['recent_seen_at'] ?? '' ) : '', $now );
 
 		if ( is_string( $existing_state ) && in_array( $existing_state, self::DECISION_STATES, true ) ) {
 			// wpdb::update() can't express `occurrence_count = occurrence_count + 1`, so this is a direct query.
@@ -123,7 +133,7 @@ final class Scanner_Identity_Store {
 			$wpdb->query(
 				$wpdb->prepare(
 					// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-					"UPDATE {$table} SET occurrence_count = occurrence_count + 1, last_seen_at = %s, recent_paths = %s,
+					"UPDATE {$table} SET occurrence_count = occurrence_count + 1, last_seen_at = %s, recent_paths = %s, recent_seen_at = %s,
 						asn = COALESCE(NULLIF(%d, 0), asn),
 						asn_org = COALESCE(NULLIF(%s, ''), asn_org),
 						geo_country = COALESCE(NULLIF(%s, ''), geo_country),
@@ -132,6 +142,7 @@ final class Scanner_Identity_Store {
 					WHERE fingerprint = %s",
 					$now,
 					$recent_paths,
+					$recent_seen_at,
 					$asn ?? 0,
 					$asn_org ?? '',
 					$geo_country ?? '',
@@ -149,11 +160,11 @@ final class Scanner_Identity_Store {
 				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 				"INSERT INTO {$table} (
 					ip, claimed_identity, user_agent, vendor_key, surface, verification_state,
-					network_match, fingerprint, occurrence_count, first_seen_at, last_seen_at, recent_paths,
+					network_match, fingerprint, occurrence_count, first_seen_at, last_seen_at, recent_paths, recent_seen_at,
 					asn, asn_org, geo_country, geo_region, geo_city
 				) VALUES (
 					%s, %s, %s, %s, %s, %s,
-					%s, %s, %d, %s, %s, %s,
+					%s, %s, %d, %s, %s, %s, %s,
 					%d, %s, %s, %s, %s
 				) ON DUPLICATE KEY UPDATE
 					occurrence_count = occurrence_count + 1,
@@ -162,6 +173,7 @@ final class Scanner_Identity_Store {
 					verification_state = VALUES(verification_state),
 					network_match = VALUES(network_match),
 					recent_paths = VALUES(recent_paths),
+					recent_seen_at = VALUES(recent_seen_at),
 					asn = COALESCE(NULLIF(VALUES(asn), 0), asn),
 					asn_org = COALESCE(NULLIF(VALUES(asn_org), ''), asn_org),
 					geo_country = COALESCE(NULLIF(VALUES(geo_country), ''), geo_country),
@@ -179,6 +191,7 @@ final class Scanner_Identity_Store {
 				$now,
 				$now,
 				$recent_paths,
+				$recent_seen_at,
 				$asn ?? 0,
 				$asn_org ?? '',
 				$geo_country ?? '',
@@ -208,6 +221,28 @@ final class Scanner_Identity_Store {
 		}
 
 		$encoded = wp_json_encode( array_values( $paths ) );
+		return false !== $encoded ? $encoded : '[]';
+	}
+
+	/**
+	 * Appends $timestamp (a MySQL datetime string) to the existing JSON-
+	 * encoded recent_seen_at array, keeping only the most recent
+	 * MAX_RECENT_PATHS entries -- mirrors append_recent_path() exactly, so
+	 * the two arrays stay index-aligned entry-for-entry.
+	 */
+	private function append_recent_timestamp( string $existing_json, string $timestamp ): string {
+		$timestamps = json_decode( $existing_json, true );
+		if ( ! is_array( $timestamps ) ) {
+			$timestamps = array();
+		}
+
+		$timestamps[] = $timestamp;
+
+		if ( count( $timestamps ) > self::MAX_RECENT_PATHS ) {
+			$timestamps = array_slice( $timestamps, -self::MAX_RECENT_PATHS );
+		}
+
+		$encoded = wp_json_encode( array_values( $timestamps ) );
 		return false !== $encoded ? $encoded : '[]';
 	}
 
