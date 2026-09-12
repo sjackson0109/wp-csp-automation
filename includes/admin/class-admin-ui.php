@@ -93,6 +93,7 @@ use WP_SAM\Intelligence\Ip_Resolver;
 use WP_SAM\Intelligence\Ip_Rule_Store;
 use WP_SAM\Intelligence\Iso_Countries;
 use WP_SAM\Intelligence\Network_Rule_Store;
+use WP_SAM\Intelligence\Recommendation_Dismissal_Store;
 use WP_SAM\Intelligence\Robots_Rules_Store;
 use WP_SAM\Intelligence\Security_Txt_Store;
 use WP_SAM\Intelligence\Tor_Exit_List_Store;
@@ -207,6 +208,7 @@ class Admin_UI {
 		add_action( 'admin_post_wp_sam_issue_certificate', array( $this, 'handle_issue_certificate' ) );
 		add_action( 'admin_post_wp_sam_download_certificate', array( $this, 'handle_download_certificate' ) );
 		add_action( 'admin_post_wp_sam_export_evidence', array( $this, 'handle_export_evidence' ) );
+		add_action( 'admin_post_wp_sam_dismiss_recommendation', array( $this, 'handle_dismiss_recommendation' ) );
 		add_action( 'wp_ajax_wp_sam_manual_scan', array( $this, 'ajax_manual_scan' ) );
 		add_action( 'wp_ajax_wp_sam_approve_source', array( $this, 'ajax_approve_source' ) );
 		add_action( 'wp_ajax_wp_sam_deny_source', array( $this, 'ajax_deny_source' ) );
@@ -2234,6 +2236,24 @@ class Admin_UI {
 		header( 'Content-Type: application/json' );
 		header( 'Content-Disposition: attachment; filename="security-evidence-export-' . gmdate( 'Y-m-d' ) . '.json"' );
 		echo false !== $json ? $json : '{}'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- JSON file download, not an HTML context.
+		exit;
+	}
+
+	// ── Recommendations (Phase 4F) ────────────────────────────────────────────
+
+	public function handle_dismiss_recommendation(): void {
+		check_admin_referer( 'wp_sam_dismiss_recommendation' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have permission to manage recommendations.', 'vcns-security-automation-manager' ) );
+		}
+
+		( new Recommendation_Dismissal_Store() )->dismiss(
+			sanitize_key( wp_unslash( $_POST['recommendation_key'] ?? '' ) ),
+			get_current_user_id(),
+			sanitize_textarea_field( wp_unslash( $_POST['reason'] ?? '' ) )
+		);
+
+		wp_safe_redirect( admin_url( 'admin.php?page=security-automation-manager&tab=recommendations' ) );
 		exit;
 	}
 

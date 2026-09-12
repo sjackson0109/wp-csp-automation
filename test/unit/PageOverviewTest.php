@@ -13,12 +13,14 @@
 declare( strict_types=1 );
 
 use PHPUnit\Framework\TestCase;
+use WP_SAM\Intelligence\Recommendation_Registry;
 
 class PageOverviewTest extends TestCase {
 
 	protected function setUp(): void {
 		wp_test_reset_globals();
 		$GLOBALS['_wp_current_user_can']['manage_options'] = true;
+		Recommendation_Registry::reset();
 	}
 
 	private function render_getting_started(): string {
@@ -102,6 +104,28 @@ class PageOverviewTest extends TestCase {
 		$this->assertStringContainsString( 'At least one surface enforcing', $output );
 		$this->assertStringContainsString( 'Captured', $output );
 		$this->assertStringContainsString( 'Issued', $output );
+	}
+
+	private function render_recommendations(): string {
+		$_GET['tab'] = 'recommendations';
+
+		$plugin   = \WP_SAM\Plugin::instance();
+		$admin_ui = new \WP_SAM\Admin\Admin_UI( $plugin );
+
+		ob_start();
+		$admin_ui->render_overview();
+		$output = (string) ob_get_clean();
+
+		unset( $_GET['tab'] );
+
+		return $output;
+	}
+
+	public function test_recommendations_tab_shows_the_empty_state_when_no_rules_are_registered(): void {
+		$output = $this->render_recommendations();
+
+		$this->assertStringContainsString( 'Recommendations', $output );
+		$this->assertStringContainsString( 'Nothing to suggest right now', $output );
 	}
 
 	public function test_other_tabs_still_render_and_link_to_getting_started(): void {

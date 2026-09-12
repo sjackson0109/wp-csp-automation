@@ -3,7 +3,7 @@
  * Plugin Name:       VCNS Security Automation Manager
  * Plugin URI:        https://github.com/vcns/security-automation-manager
  * Description:       Self-learning security headers, built-in attack detection and rate limiting, file-integrity monitoring, and free TLS certificates. No paywall.
- * Version:           2.9.101
+ * Version:           2.9.102
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            VCNS Tech Ltd
@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // ── Core constants ────────────────────────────────────────────────────────────
-define( 'WP_SAM_VERSION', '2.9.101' );
+define( 'WP_SAM_VERSION', '2.9.102' );
 
 /**
  * Schema version. Increment whenever a database schema change is made.
@@ -313,8 +313,16 @@ define( 'WP_SAM_VERSION', '2.9.101' );
  *        disproportionate share of a source's recent requests were
  *        4xx/5xx -- the classic signature of a scanner probing for paths
  *        that don't exist or aren't allowed.
+ *   v45: adds sam_recommendation_dismissals (Phase 4F, Recommendations
+ *        Engine -- .roadmap/phase3_early_plan.md §22, Foundation increment).
+ *        The only new table this feature needs: one row per administrator
+ *        decision not to act on a live recommendation yet, with a required
+ *        reason. Recommendation content itself is never persisted -- it is
+ *        always recomputed from existing evidence on each admin page load.
+ *        See Intelligence\Recommendation_Engine, Intelligence\
+ *        Recommendation_Registry, Intelligence\Recommendation_Dismissal_Store.
  */
-define( 'WP_SAM_DB_VERSION', '44' );
+define( 'WP_SAM_DB_VERSION', '45' );
 
 define( 'WP_SAM_FILE', __FILE__ );
 define( 'WP_SAM_DIR', plugin_dir_path( __FILE__ ) );
