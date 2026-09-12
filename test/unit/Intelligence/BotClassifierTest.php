@@ -259,4 +259,55 @@ class BotClassifierTest extends TestCase {
 
 		$this->assertSame( 'unclassified', $this->classifier->classify( $identity, null ) );
 	}
+
+	// ── Repeated-errors signal (Phase 4C carried-forward item) ──────────────
+
+	public function test_unrecognised_source_with_mostly_errors_is_error_probing_scanner(): void {
+		$identity = $this->identity( array( 'recent_errors' => wp_json_encode( array( 1, 1, 1, 0 ) ) ) );
+
+		$this->assertSame( 'error_probing_scanner', $this->classifier->classify( $identity, null ) );
+	}
+
+	public function test_error_probing_check_wins_over_rate_escalation(): void {
+		$identity = $this->identity( array( 'recent_errors' => wp_json_encode( array( 1, 1, 1, 1 ) ) ) );
+		$block    = array( 'stage' => 'temporary_block' );
+
+		$this->assertSame( 'error_probing_scanner', $this->classifier->classify( $identity, $block ) );
+	}
+
+	public function test_timing_check_wins_over_error_probing_when_both_signals_are_present(): void {
+		// Timing is checked first, per the class's own documented order.
+		$identity = $this->identity(
+			array(
+				'recent_seen_at' => wp_json_encode( $this->fixed_interval_timestamps() ),
+				'recent_errors'  => wp_json_encode( array( 1, 1, 1, 1 ) ),
+			)
+		);
+
+		$this->assertSame( 'scripted_timing', $this->classifier->classify( $identity, null ) );
+	}
+
+	public function test_a_known_crawlers_errors_are_never_flagged(): void {
+		$identity = $this->identity(
+			array(
+				'verification_state' => 'known_crawler',
+				'network_match'      => 1,
+				'recent_errors'      => wp_json_encode( array( 1, 1, 1, 1 ) ),
+			)
+		);
+
+		$this->assertSame( 'verified_crawler', $this->classifier->classify( $identity, null ) );
+	}
+
+	public function test_missing_recent_errors_is_treated_as_no_error_pattern(): void {
+		$identity = $this->identity(); // No 'recent_errors' key at all.
+
+		$this->assertSame( 'unclassified', $this->classifier->classify( $identity, null ) );
+	}
+
+	public function test_malformed_recent_errors_json_is_treated_as_no_error_pattern(): void {
+		$identity = $this->identity( array( 'recent_errors' => 'not valid json' ) );
+
+		$this->assertSame( 'unclassified', $this->classifier->classify( $identity, null ) );
+	}
 }

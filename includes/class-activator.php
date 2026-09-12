@@ -928,6 +928,14 @@ class Activator {
 		// "timing" signal §10's own list names): bounded JSON array of this
 		// identity's last MAX_RECENT_PATHS request timestamps, appended in
 		// lockstep with recent_paths. See Request_Timing_Analyzer.
+		// recent_errors (schema v44, Phase 4C carried-forward item -- the
+		// "repeated errors" signal §10's own list names, the last of the
+		// two): bounded JSON array of 0/1 ints, appended in lockstep with
+		// recent_paths/recent_seen_at, recording whether each request's
+		// eventual HTTP response was >= 400. See Request_Observer::
+		// flush_identity_write() (deferred to 'shutdown', since the
+		// eventual status isn't known yet when identity resolution itself
+		// happens) and Repeated_Error_Analyzer.
 		dbDelta(
 			"CREATE TABLE {$p}sam_scanner_identities (
   id bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -950,6 +958,7 @@ class Activator {
   last_seen_at datetime NOT NULL,
   recent_paths longtext NOT NULL,
   recent_seen_at longtext NOT NULL,
+  recent_errors longtext NOT NULL,
   asn int(10) UNSIGNED DEFAULT NULL,
   asn_org varchar(255) NOT NULL DEFAULT '',
   geo_country varchar(8) NOT NULL DEFAULT '',

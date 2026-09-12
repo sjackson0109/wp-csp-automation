@@ -39,6 +39,18 @@
  * a scripted client sleeping a fixed duration between requests, rather
  * than a person's naturally irregular browsing.
  *
+ * recent_errors (schema v44, Phase 4C carried-forward item -- the
+ * "repeated errors" signal §10's own list names) holds this identity's
+ * last MAX_RECENT_PATHS request outcomes as a JSON array of 0/1 ints,
+ * oldest first, appended in lockstep with recent_paths/recent_seen_at.
+ * Unlike those two, $is_error is never optional/null here -- "this
+ * request was not an error" is itself meaningful information, not an
+ * unknown. Read by Repeated_Error_Analyzer to recognise a source whose
+ * recent requests were disproportionately 4xx/5xx responses -- the
+ * classic signature of a scanner probing for paths that don't exist or
+ * aren't allowed, distinct from Uri_Pattern_Analyzer's enumeration signal
+ * (which is about a *pattern* in what's requested, not whether it existed).
+ *
  * asn/asn_org/geo_country/geo_region/geo_city (schema v42, Phase 4A
  * carried-forward item) are optional -- record() only receives them on a
  * request where Network_Intelligence_Resolver was already resolved (i.e.
@@ -90,7 +102,8 @@ final class Scanner_Identity_Store {
 		?string $asn_org = null,
 		?string $geo_country = null,
 		?string $geo_region = null,
-		?string $geo_city = null
+		?string $geo_city = null,
+		bool $is_error = false
 	): void {
 		global $wpdb;
 		$table = $wpdb->prefix . 'sam_scanner_identities';
@@ -115,10 +128,11 @@ final class Scanner_Identity_Store {
 		$now = current_time( 'mysql', true );
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		$existing       = $wpdb->get_row( $wpdb->prepare( "SELECT verification_state, recent_paths, recent_seen_at FROM {$table} WHERE fingerprint = %s", $fingerprint ), ARRAY_A );
+		$existing       = $wpdb->get_row( $wpdb->prepare( "SELECT verification_state, recent_paths, recent_seen_at, recent_errors FROM {$table} WHERE fingerprint = %s", $fingerprint ), ARRAY_A );
 		$existing_state = is_array( $existing ) ? (string) ( $existing['verification_state'] ?? '' ) : null;
 		$recent_paths   = $this->append_recent_path( is_array( $existing ) ? (string) ( $existing['recent_paths'] ?? '' ) : '', $path );
 		$recent_seen_at = $this->append_recent_timestamp( is_array( $existing ) ? (string) ( $existing['recent_seen_at'] ?? '' ) : '', $now );
+		$recent_errors  = $this->append_recent_error( is_array( $existing ) ? (string) ( $existing['recent_errors'] ?? '' ) : '', $is_error );
 
 		if ( is_string( $existing_state ) && in_array( $existing_state, self::DECISION_STATES, true ) ) {
 			// wpdb::update() can't express `occurrence_count = occurrence_count + 1`, so this is a direct query.
@@ -133,7 +147,7 @@ final class Scanner_Identity_Store {
 			$wpdb->query(
 				$wpdb->prepare(
 					// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-					"UPDATE {$table} SET occurrence_count = occurrence_count + 1, last_seen_at = %s, recent_paths = %s, recent_seen_at = %s,
+					"UPDATE {$table} SET occurrence_count = occurrence_count + 1, last_seen_at = %s, recent_paths = %s, recent_seen_at = %s, recent_errors = %s,
 						asn = COALESCE(NULLIF(%d, 0), asn),
 						asn_org = COALESCE(NULLIF(%s, ''), asn_org),
 						geo_country = COALESCE(NULLIF(%s, ''), geo_country),
@@ -143,6 +157,7 @@ final class Scanner_Identity_Store {
 					$now,
 					$recent_paths,
 					$recent_seen_at,
+					$recent_errors,
 					$asn ?? 0,
 					$asn_org ?? '',
 					$geo_country ?? '',
@@ -160,11 +175,11 @@ final class Scanner_Identity_Store {
 				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 				"INSERT INTO {$table} (
 					ip, claimed_identity, user_agent, vendor_key, surface, verification_state,
-					network_match, fingerprint, occurrence_count, first_seen_at, last_seen_at, recent_paths, recent_seen_at,
+					network_match, fingerprint, occurrence_count, first_seen_at, last_seen_at, recent_paths, recent_seen_at, recent_errors,
 					asn, asn_org, geo_country, geo_region, geo_city
 				) VALUES (
 					%s, %s, %s, %s, %s, %s,
-					%s, %s, %d, %s, %s, %s, %s,
+					%s, %s, %d, %s, %s, %s, %s, %s,
 					%d, %s, %s, %s, %s
 				) ON DUPLICATE KEY UPDATE
 					occurrence_count = occurrence_count + 1,
@@ -174,6 +189,7 @@ final class Scanner_Identity_Store {
 					network_match = VALUES(network_match),
 					recent_paths = VALUES(recent_paths),
 					recent_seen_at = VALUES(recent_seen_at),
+					recent_errors = VALUES(recent_errors),
 					asn = COALESCE(NULLIF(VALUES(asn), 0), asn),
 					asn_org = COALESCE(NULLIF(VALUES(asn_org), ''), asn_org),
 					geo_country = COALESCE(NULLIF(VALUES(geo_country), ''), geo_country),
@@ -192,6 +208,7 @@ final class Scanner_Identity_Store {
 				$now,
 				$recent_paths,
 				$recent_seen_at,
+				$recent_errors,
 				$asn ?? 0,
 				$asn_org ?? '',
 				$geo_country ?? '',
@@ -243,6 +260,28 @@ final class Scanner_Identity_Store {
 		}
 
 		$encoded = wp_json_encode( array_values( $timestamps ) );
+		return false !== $encoded ? $encoded : '[]';
+	}
+
+	/**
+	 * Appends $is_error (as 1/0) to the existing JSON-encoded recent_errors
+	 * array, keeping only the most recent MAX_RECENT_PATHS entries -- same
+	 * bound as recent_paths/recent_seen_at, but always appends (a "not an
+	 * error" outcome is itself recorded, unlike a blank path).
+	 */
+	private function append_recent_error( string $existing_json, bool $is_error ): string {
+		$errors = json_decode( $existing_json, true );
+		if ( ! is_array( $errors ) ) {
+			$errors = array();
+		}
+
+		$errors[] = $is_error ? 1 : 0;
+
+		if ( count( $errors ) > self::MAX_RECENT_PATHS ) {
+			$errors = array_slice( $errors, -self::MAX_RECENT_PATHS );
+		}
+
+		$encoded = wp_json_encode( array_values( $errors ) );
 		return false !== $encoded ? $encoded : '[]';
 	}
 
