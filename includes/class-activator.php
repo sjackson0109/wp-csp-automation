@@ -333,6 +333,7 @@ class Activator {
 			'sam_custom_detector_rules',
 			'sam_network_rules',
 			'sam_exceptions',
+			'sam_recommendation_dismissals',
 		);
 	}
 
@@ -1394,6 +1395,24 @@ class Activator {
   PRIMARY KEY  (id),
   KEY review_status (review_status),
   KEY control_surface (control, surface)
+) {$cc};"
+		);
+
+		// Schema v45: sam_recommendation_dismissals -- Phase 4F, Recommendations
+		// Engine (.roadmap/phase3_early_plan.md §22). The only new table this
+		// feature needs; recommendation content itself is always recomputed
+		// live from existing evidence, never persisted. One row per
+		// administrator decision not to act on a recommendation yet, with a
+		// required reason. See Intelligence\Recommendation_Dismissal_Store.
+		dbDelta(
+			"CREATE TABLE {$p}sam_recommendation_dismissals (
+  id bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+  recommendation_key varchar(191) NOT NULL,
+  dismissed_by bigint(20) UNSIGNED NOT NULL,
+  dismissed_at datetime NOT NULL,
+  reason text NOT NULL,
+  PRIMARY KEY  (id),
+  UNIQUE KEY recommendation_key (recommendation_key)
 ) {$cc};"
 		);
 

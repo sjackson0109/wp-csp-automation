@@ -26,6 +26,7 @@ use WP_SAM\Certificates\Certificate_Store;
 use WP_SAM\CSP\Automation_Config;
 use WP_SAM\Intelligence\Baseline_Store;
 use WP_SAM\Intelligence\Detector_Registry;
+use WP_SAM\Intelligence\Recommendation_Engine;
 use WP_SAM\Intelligence\Security_Health;
 use WP_SAM\Intelligence\Traffic_Policy_Store;
 use WP_SAM\Rollback_Guard;
@@ -34,7 +35,7 @@ global $wpdb;
 
 // Current tab.
 $tab          = isset( $_GET['tab'] ) ? sanitize_text_field( wp_unslash( $_GET['tab'] ) ) : 'overview';
-$allowed_tabs = array( 'overview', 'getting-started', 'health', 'readiness', 'recovery', 'exceptions', 'updates', 'about' );
+$allowed_tabs = array( 'overview', 'getting-started', 'health', 'recommendations', 'readiness', 'recovery', 'exceptions', 'updates', 'about' );
 if ( ! in_array( $tab, $allowed_tabs, true ) ) {
 	$tab = 'overview';
 }
@@ -52,6 +53,10 @@ $tab_help = array(
 	'health'          => array(
 		'label'       => __( 'Security Health', 'vcns-security-automation-manager' ),
 		'description' => __( 'A plain-language summary of security outcomes -- enforcement, drift, certificates, dependencies, and open exceptions -- plus an evidence export for reviews and audits.', 'vcns-security-automation-manager' ),
+	),
+	'recommendations' => array(
+		'label'       => __( 'Recommendations', 'vcns-security-automation-manager' ),
+		'description' => __( 'Prioritised, evidence-backed suggestions drawn from what this plugin already observes -- what to review or consider changing, and why, never applied automatically.', 'vcns-security-automation-manager' ),
 	),
 	'readiness'       => array(
 		'label'       => __( 'Readiness', 'vcns-security-automation-manager' ),
@@ -78,6 +83,11 @@ $tab_help = array(
 // ── Health tab data ──────────────────────────────────────────────────────────
 if ( 'health' === $tab ) {
 	$security_health = ( new Security_Health() )->get_report();
+}
+
+// ── Recommendations tab data (Phase 4F) ─────────────────────────────────────
+if ( 'recommendations' === $tab ) {
+	$recommendations = ( new Recommendation_Engine() )->get_recommendations();
 }
 
 // ── Overview tab data ────────────────────────────────────────────────────────
@@ -195,21 +205,6 @@ $import_result      = sanitize_text_field( wp_unslash( $_GET['wp_sam_import'] ??
 $import_reason      = rawurldecode( sanitize_text_field( wp_unslash( $_GET['wp_sam_import_reason'] ?? '' ) ) );
 $downgrade_flag     = get_option( Rollback_Guard::DOWNGRADE_OPTION, array() );
 $rollback_snapshots = Rollback_Guard::list_snapshots();
-$status_badge       = static function ( string $status ): void {
-	$labels = array(
-		'pass'    => __( 'Pass', 'vcns-security-automation-manager' ),
-		'warning' => __( 'Warning', 'vcns-security-automation-manager' ),
-		'fail'    => __( 'Fail', 'vcns-security-automation-manager' ),
-		'info'    => __( 'Info', 'vcns-security-automation-manager' ),
-	);
-	$label  = $labels[ $status ] ?? __( 'Unknown', 'vcns-security-automation-manager' );
-
-	printf(
-		'<span class="wp-sam-readiness-badge status-%1$s">%2$s</span>',
-		esc_attr( $status ),
-		esc_html( $label )
-	);
-};
 ?>
 <div class="wrap wp-sam-wrap">
 	<h1><?php esc_html_e( 'Security Automation Manager', 'vcns-security-automation-manager' ); ?></h1>
@@ -269,7 +264,7 @@ $status_badge       = static function ( string $status ): void {
 							$layer1_readiness_status = 'warning';
 						}
 					}
-					$status_badge( $layer1_readiness_status );
+					echo Status_Badge::render_outcome( $layer1_readiness_status ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Status_Badge::render_outcome() returns pre-escaped HTML.
 					?>
 				</td>
 				<td>
@@ -280,7 +275,7 @@ $status_badge       = static function ( string $status ): void {
 			</tr>
 			<tr>
 				<td><strong><?php esc_html_e( 'Recovery', 'vcns-security-automation-manager' ); ?></strong></td>
-				<td><?php $status_badge( empty( $downgrade_flag ) ? 'pass' : 'fail' ); ?></td>
+				<td><?php echo Status_Badge::render_outcome( empty( $downgrade_flag ) ? 'pass' : 'fail' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></td>
 				<td>
 					<a href="<?php echo esc_url( add_query_arg( 'tab', 'recovery', $base_url ) ); ?>">
 						<?php esc_html_e( 'View Recovery', 'vcns-security-automation-manager' ); ?>
@@ -599,7 +594,7 @@ $status_badge       = static function ( string $status ): void {
 				<tr>
 					<th scope="row"><?php echo esc_html( $item['label'] ); ?></th>
 					<td><code><?php echo esc_html( (string) $item['value'] ); ?></code></td>
-					<td><?php $status_badge( $item['status'] ); ?></td>
+					<td><?php echo Status_Badge::render_outcome( $item['status'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Status_Badge::render_outcome() returns pre-escaped HTML. ?></td>
 				</tr>
 			<?php endforeach; ?>
 		</tbody>
@@ -625,7 +620,7 @@ $status_badge       = static function ( string $status ): void {
 							: esc_html( (string) $item['rows'] );
 						?>
 					</td>
-					<td><?php $status_badge( $item['status'] ); ?></td>
+					<td><?php echo Status_Badge::render_outcome( $item['status'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Status_Badge::render_outcome() returns pre-escaped HTML. ?></td>
 				</tr>
 			<?php endforeach; ?>
 		</tbody>
@@ -645,7 +640,7 @@ $status_badge       = static function ( string $status ): void {
 				<tr>
 					<th scope="row"><?php echo esc_html( $item['label'] ); ?></th>
 					<td><code><?php echo esc_html( (string) $item['value'] ); ?></code></td>
-					<td><?php $status_badge( $item['status'] ); ?></td>
+					<td><?php echo Status_Badge::render_outcome( $item['status'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Status_Badge::render_outcome() returns pre-escaped HTML. ?></td>
 				</tr>
 			<?php endforeach; ?>
 		</tbody>
@@ -686,7 +681,7 @@ $status_badge       = static function ( string $status ): void {
 						<?php endif; ?>
 					</th>
 					<td><?php echo esc_html( (string) $item['value'] ); ?></td>
-					<td><?php $status_badge( $item['status'] ); ?></td>
+					<td><?php echo Status_Badge::render_outcome( $item['status'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Status_Badge::render_outcome() returns pre-escaped HTML. ?></td>
 				</tr>
 			<?php endforeach; ?>
 		</tbody>
@@ -708,6 +703,91 @@ $status_badge       = static function ( string $status ): void {
 		</p>
 		<?php submit_button( __( 'Download Evidence Export', 'vcns-security-automation-manager' ), 'primary', '', false ); ?>
 	</form>
+
+	<?php elseif ( 'recommendations' === $tab ) : ?>
+
+	<p>
+		<?php esc_html_e( 'Each suggestion below is generated from evidence this plugin already collects elsewhere -- nothing here is a new signal source. Acting on one always means going to the relevant page yourself; nothing is ever applied automatically. A recommendation you dismiss stays hidden until the evidence behind it actually changes.', 'vcns-security-automation-manager' ); ?>
+	</p>
+
+		<?php if ( empty( $recommendations ) ) : ?>
+	<p class="description"><?php esc_html_e( 'Nothing to suggest right now -- either everything already looks reasonable, or this build\'s rule catalogue doesn\'t cover your current configuration yet. This grows over time as more rules are added.', 'vcns-security-automation-manager' ); ?></p>
+	<?php else : ?>
+	<table class="widefat striped wp-sam-readiness-table">
+		<thead>
+			<tr>
+				<th><?php esc_html_e( 'Recommendation', 'vcns-security-automation-manager' ); ?></th>
+				<th><?php esc_html_e( 'Risk', 'vcns-security-automation-manager' ); ?></th>
+				<th><?php esc_html_e( 'Affected area', 'vcns-security-automation-manager' ); ?></th>
+				<th><?php esc_html_e( 'Action', 'vcns-security-automation-manager' ); ?></th>
+			</tr>
+		</thead>
+		<tbody>
+			<?php
+			$recommendation_risk_status = array(
+				'critical' => 'fail',
+				'high'     => 'warning',
+				'medium'   => 'warning',
+				'low'      => 'info',
+			);
+			$recommendation_risk_label  = array(
+				'critical' => __( 'Critical risk', 'vcns-security-automation-manager' ),
+				'high'     => __( 'High risk', 'vcns-security-automation-manager' ),
+				'medium'   => __( 'Medium risk', 'vcns-security-automation-manager' ),
+				'low'      => __( 'Low risk', 'vcns-security-automation-manager' ),
+			);
+			?>
+			<?php foreach ( $recommendations as $recommendation ) : ?>
+			<tr>
+				<td>
+					<strong><?php echo esc_html( $recommendation['observed'] ); ?></strong>
+					<p class="description" style="margin:0.3em 0 0;"><?php echo esc_html( $recommendation['why_it_matters'] ); ?></p>
+					<p class="description" style="margin:0.3em 0 0;">
+						<?php
+						echo esc_html(
+							sprintf(
+								/* translators: 1: recommended action, 2: rollback position */
+								__( 'Suggested: %1$s. %2$s', 'vcns-security-automation-manager' ),
+								$recommendation['recommended_action'],
+								$recommendation['rollback_position']
+							)
+						);
+						?>
+					</p>
+				</td>
+				<td>
+					<?php
+					$risk = (string) $recommendation['risk'];
+					echo Status_Badge::render_outcome( $recommendation_risk_status[ $risk ] ?? 'info', $recommendation_risk_label[ $risk ] ?? ucfirst( $risk ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Status_Badge::render_outcome() returns pre-escaped HTML.
+					?>
+				</td>
+				<td>
+					<?php
+					echo esc_html(
+						implode(
+							' / ',
+							array_filter( array( $recommendation['layer'], $recommendation['pillar'] ?? null, $recommendation['surface'] ?? null ) )
+						)
+					);
+					?>
+				</td>
+				<td>
+					<a href="<?php echo esc_url( $recommendation['cta_url'] ); ?>"><?php esc_html_e( 'Go there', 'vcns-security-automation-manager' ); ?></a>
+					<?php if ( ! empty( $recommendation['dismissible'] ) ) : ?>
+					<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin-top:0.5em;display:flex;gap:0.3em;align-items:center;">
+						<?php wp_nonce_field( 'wp_sam_dismiss_recommendation' ); ?>
+						<input type="hidden" name="action" value="wp_sam_dismiss_recommendation" />
+						<input type="hidden" name="recommendation_key" value="<?php echo esc_attr( (string) $recommendation['key'] ); ?>" />
+						<input type="text" name="reason" placeholder="<?php esc_attr_e( 'Reason (required)', 'vcns-security-automation-manager' ); ?>" required style="width:14em;" />
+						<?php submit_button( __( 'Dismiss', 'vcns-security-automation-manager' ), 'secondary small', '', false ); ?>
+					</form>
+					<?php endif; ?>
+				</td>
+			</tr>
+			<?php endforeach; ?>
+		</tbody>
+	</table>
+	<?php endif; ?>
 
 	<?php elseif ( 'recovery' === $tab ) : ?>
 

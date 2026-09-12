@@ -159,6 +159,15 @@ Lowest priority in this document, deliberately -- §22's own text and the origin
 
 **Confirmed as the next active phase, 12 September 2026.** Phase 4A-4C have all shipped. Sequencing against the SAM Portal build (`.roadmap/sam_portal_plan.md`) was explicitly decided: 4F first, portal Foundation-phase work starts after -- see that document's §5.2.
 
+**Foundation increment delivered, v2.9.102 (12 September 2026).** `Intelligence\Recommendation_Rule` (the deterministic-authority contract §22 requires), `Recommendation_Registry` (mirrors `Detector_Registry`'s registration/extension-point shape), and `Recommendation_Engine::get_recommendations()` (aggregates every registered rule, drops still-validly-dismissed recommendations, sorts by risk). New `sam_recommendation_dismissals` table (schema v45) via `Recommendation_Dismissal_Store` -- the only new table this feature needs, since recommendation content is always recomputed live from existing evidence, never persisted; only an admin's explicit "not acting on this yet" decision (with a required reason) is stored, and it reopens automatically once the underlying evidence changes. New "Recommendations" tab on Settings/Overview, right after Security Health. No rules registered yet -- this increment ships the architecture only. `Status_Badge::render_outcome()` also added, promoting a `pass`/`warning`/`fail`/`info` badge closure previously duplicated across the Readiness and Security Health tabs into one shared method (Recommendations' risk badges are the third consumer that made this worth sharing).
+
+Remaining increments (each its own PR, per this document's established per-phase cadence):
+- Rule batch 1 -- certificate renewal due, unexplained high/critical-risk drift, exception nearing expiry. Zero new store methods needed (`Certificate_Store::renewal_due()`, `Drift_Store::all('unexplained')`, `Exception_Store::due_for_notice()` already exist).
+- Rule batch 2 -- CSP surface report-only + quiet + no active exception, suggesting enforce. Needs one new small read method against `csp_violation_reports` (currently write-only via `Violation_Reporter`).
+- Rule batch 3 -- the same enforce-readiness check for COOP/COEP (the two pillars with their own report-only + Reporting API delivery). Needs the equivalent new read method against `sam_pillar_violation_reports` (currently write-only via `Pillar_Violation_Store`).
+- Rule batch 4 -- detector disabled but firing recently. Needs a new `Event_Store::occurrences_since()` aggregate (today's read methods are only `distinct_ips()`/`active_detector_surfaces()`).
+- Docs/roadmap closeout once all rule batches ship.
+
 ## Phase 4G: UI Documentation Retrofit and Guided Onboarding
 
 **Status: Fully delivered (v2.9.67-v2.9.98, 4-10 September 2026). Admin-UI retrofit, public-docs retrofit, and the guided onboarding flow are all shipped. Phase 4G is complete.**

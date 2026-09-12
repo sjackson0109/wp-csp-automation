@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows semantic versioning for plugin releases.
 
+## [2.9.102] - 2026-09-12
+
+### Added
+
+- Phase 4F (Recommendations Engine, `.roadmap/phase3_early_plan.md` §22) -- Foundation increment. New `Intelligence\Recommendation_Rule` interface, `Recommendation_Registry` (mirrors `Detector_Registry`'s registration/extension-point shape, fired via a new `wp_sam_register_recommendation_rules` action), and `Recommendation_Engine::get_recommendations()`, which aggregates every registered rule's output, drops still-validly-dismissed recommendations, and sorts by risk. No rules are registered yet in this increment -- concrete rules land in the increments that follow (see `.roadmap/phase4_plan.md`).
+- New `sam_recommendation_dismissals` table (schema v45), the only new table this feature needs: recommendation content is always recomputed live from existing evidence, never persisted -- only an administrator's explicit "not acting on this yet" decision, with a required reason, via the new `Intelligence\Recommendation_Dismissal_Store`. A dismissal is not permanent: it reopens automatically once the underlying evidence changes after the dismissal timestamp, the same pattern `Admin_UI::handle_dismiss_conflicts()` already uses for the CSP dashboard's conflict banner.
+- New "Recommendations" tab on Settings/Overview, positioned right after Security Health. Empty-state message until the first rule batch ships.
+- `Status_Badge::render_outcome()` -- promotes what used to be an inline `pass`/`warning`/`fail`/`info` badge closure duplicated across the Readiness and Security Health tabs into a single shared method (a third consumer, Recommendations' risk badges, is why this became worth sharing). Readiness and Security Health now call it instead of the old closure; no visible change.
+- 15 new tests across `RecommendationRegistryTest`, `RecommendationEngineTest`, `RecommendationDismissalStoreTest` (all new), plus `StatusBadgeTest` and `PageOverviewTest` extended.
+
 ## [2.9.101] - 2026-09-12
 
 ### Added
