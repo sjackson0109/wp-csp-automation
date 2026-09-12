@@ -157,6 +157,8 @@ This is the phase most directly shaped by the commercial-direction shift: the pr
 
 Lowest priority in this document, deliberately -- §22's own text and the original Phase 3J framing both suggest recommendation-quality work benefits from more operational data existing first (more detector families live, more traffic-control dimensions live, more real drift/campaign history accumulated). Revisit sequencing once Phase 4A-4C have shipped and there's real evidence to recommend against.
 
+**Confirmed as the next active phase, 12 September 2026.** Phase 4A-4C have all shipped. Sequencing against the SAM Portal build (`.roadmap/sam_portal_plan.md`) was explicitly decided: 4F first, portal Foundation-phase work starts after -- see that document's §5.2.
+
 ## Phase 4G: UI Documentation Retrofit and Guided Onboarding
 
 **Status: Fully delivered (v2.9.67-v2.9.98, 4-10 September 2026). Admin-UI retrofit, public-docs retrofit, and the guided onboarding flow are all shipped. Phase 4G is complete.**
@@ -203,7 +205,7 @@ Carried forward, unchanged, from `.roadmap/phase3_early_plan.md` and the 2026-09
 
 # 5. Sequencing Recommendation
 
-Not a commitment, a starting proposal -- reorder freely:
+Not a commitment, a starting proposal -- reorder freely. **Superseded for items 2 and 6 by the 12 September 2026 sequencing decision: Phase 4F now goes before the SAM Portal build, the reverse of the order below** (see `.roadmap/sam_portal_plan.md` §5.2). Left as-is otherwise for historical record -- items 1/3/4/5 are already resolved.
 
 1. **4D (Documentation and Technical Debt Closeout) first.** Lowest risk, no dependencies, clears real accumulated debt before it compounds further. Can run in parallel with anything else.
 2. **SAM Portal build second** (now tracked in `.roadmap/sam_portal_plan.md`, not here), given the explicit commercial-direction shift and that GitHub #172's closure already named this as the intended near-term direction.

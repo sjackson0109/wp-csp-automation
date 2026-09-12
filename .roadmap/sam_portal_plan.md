@@ -4,7 +4,7 @@
 **Product:** VCNS SAM Platform -- portal component
 **Repository:** `vcns/sam-portal` (does not exist yet -- confirmed against GitHub, 12 September 2026)
 **Companion document:** `docs/sam-portal-requirements-spec.md` -- that document is the fixed architecture and requirements baseline (rewritten 2026-09-04; its own §24 "Decisions Fixed by This Specification" settles naming, repo boundaries, and non-negotiable security properties). **This document does not repeat or reinterpret that spec.** It tracks delivery status, breaks the spec's §20 delivery plan into a concrete feature backlog, and holds the open questions that are genuinely product/sequencing decisions rather than architecture -- the kind of living tracker `.roadmap/phase4_plan.md` is for `vcns/security-automation-manager`.
-**Status:** Pre-implementation. Nothing in `vcns/sam-portal` itself has been built. Split out of `.roadmap/phase4_plan.md`'s former Phase 4E.2 entry on 12 September 2026 because this is a separate product with its own repository, delivery plan, and (eventually) release cadence -- it doesn't fit that document's WordPress-plugin-scoped phase numbering.
+**Status:** Pre-implementation. Nothing in `vcns/sam-portal` itself has been built. Split out of `.roadmap/phase4_plan.md`'s former Phase 4E.2 entry on 12 September 2026 because this is a separate product with its own repository, delivery plan, and (eventually) release cadence -- it doesn't fit that document's WordPress-plugin-scoped phase numbering. **Sequencing decided 12 September 2026: Phase 4F (Recommendations Engine, on the `security-automation-manager` side) goes first; Foundation-phase portal work begins after 4F, not in parallel with it.** See §5 for this and the other decisions made so far.
 **Date:** 12 September 2026
 
 ---
@@ -33,21 +33,21 @@ The spec's §20 gives four dependency-ordered phases with one-line bullets. Belo
 
 ## 3.1 Foundation
 
-- **Create the `vcns/sam-portal` repository.** Ownership, CI/CD, environments (staging/production, matching `sam-licensing-service`'s existing pattern), architecture decision records. *Open question §5.1: what stack.*
+- **Create the `vcns/sam-portal` repository.** Ownership, CI/CD, environments (staging/production, matching `sam-licensing-service`'s existing pattern), architecture decision records. *Stack still open -- §5.1, deliberately deferred. Begins after Phase 4F, per the sequencing decision above.*
 - **Threat model and data-flow inventory** [§17, §18, §23] -- the spec makes this a Definition-of-Done item, not a nice-to-have; worth doing before the first line of ingestion/auth code, not after.
 - **Publish the SAM protocol schemas and cross-runtime test vectors** [§8, §19] -- this is the one artifact all three repositories need to agree on without a runtime dependency between them. Concretely: a versioned schema package (JSON Schema or similar) that `security-automation-manager` (PHP) and `sam-portal` (whatever its runtime turns out to be) both validate against. This can live in its own small repo, or inside `sam-portal` if the portal is the natural owner -- worth deciding once the portal's own stack is chosen.
 - **Remove production Stripe secrets from every customer-controlled WordPress path** [§21.2] -- this is largely a `security-automation-manager`-side cleanup (confirm no direct-Stripe compatibility path remains, rotate any previously-distributed credentials), not portal-repo work, but it's listed here because the spec places it in this phase and it blocks nothing else -- can happen independently, any time.
 
 ## 3.2 Portal minimum viable service
 
-The spec's own MVP phase is still seven substantial items. A suggested build order, prioritising what delivers customer-visible value fastest and what has the fewest upstream dependencies:
+The spec's own MVP phase is still seven substantial items. Build order, resolved 12 September 2026 (§5.3) -- licensing/Checkout integration first, since most of its server side already exists and it's the lowest new-design risk of the seven:
 
-1. **Tenant auth and RBAC** [§6] -- the 6-role model (Owner/Administrator/Approver/Analyst/Viewer/Service identity) is spec-fixed. `sam-licensing-service`'s admin-auth foundation (password hashing, admin users, sessions -- PR #18) is the closest existing pattern to extend, not a from-scratch build.
-2. **CSP reporting ingestion and safe normalisation** [§9] -- arguably the single highest-leverage first customer-facing feature: it's the one thing that works in Portal-only mode [§3.2] with zero WordPress dependency, so it's what makes a non-WordPress customer possible at all, and it's a bounded, well-specified problem (accept/reject/normalise/neutralise, no scanning-safety surface to design yet).
-3. **Protected-resource enrolment and domain verification** [§7] -- needed before ingestion can be tenant-scoped for real. Smallest defensible v1: DNS TXT only, defer HTTP well-known and adapter-based enrolment to a later slice.
-4. **Findings, evidence and notification workflow** [§11] -- depends on ingestion existing first; this is where "a report came in" becomes "here's what it means."
-5. **Licensing-service Checkout, subscription and entitlement integration** [§15] -- mostly wiring against an API that already exists server-side (`sam-licensing-service`'s Phase 2/Phase 3 work covers Checkout and subscriptions already) -- less new design than it sounds.
-6. **Public external header/CSP/TLS scanning** [§10] -- deliberately sequenced later within MVP, not because it's unimportant, but because §10.1's scan-safety requirements (SSRF prevention, DNS re-check at connection time, blocked-range enforcement, per-tenant/global kill switches) are a substantial standalone engineering effort with real infrastructure cost (egress, compute, abuse potential) -- worth its own focused build once ingestion and the dashboard shell exist to show its output in. *Open question §5.4.*
+1. **Licensing-service Checkout, subscription and entitlement integration** [§15] -- **first slice.** Mostly wiring against an API that already exists server-side (`sam-licensing-service`'s Phase 2/Phase 3 work covers Checkout and subscriptions already) -- less new design than it sounds, and gives the portal a real, working spine (tenant-to-customer linkage, entitlement state) that every later feature can build against.
+2. **Tenant auth and RBAC** [§6] -- the 6-role model (Owner/Administrator/Approver/Analyst/Viewer/Service identity) is spec-fixed. `sam-licensing-service`'s admin-auth foundation (password hashing, admin users, sessions -- PR #18) is the closest existing pattern to extend, not a from-scratch build.
+3. **CSP reporting ingestion and safe normalisation** [§9] -- still the highest-leverage customer-facing feature once auth exists: it's the one thing that works in Portal-only mode [§3.2] with zero WordPress dependency, so it's what makes a non-WordPress customer possible at all, and it's a bounded, well-specified problem (accept/reject/normalise/neutralise, no scanning-safety surface to design yet).
+4. **Protected-resource enrolment and domain verification** [§7] -- needed before ingestion can be tenant-scoped for real. Smallest defensible v1: DNS TXT only, defer HTTP well-known and adapter-based enrolment to a later slice.
+5. **Findings, evidence and notification workflow** [§11] -- depends on ingestion existing first; this is where "a report came in" becomes "here's what it means."
+6. **Public external header/CSP/TLS scanning** [§10] -- resolved 12 September 2026 (§5.4): build in-house, per §10.1's spec as written -- SSRF prevention, DNS re-check at connection time, blocked-range enforcement, per-tenant/global kill switches, no third-party shortcut or deferral. Still sequenced later within MVP since it's a substantial standalone engineering effort best done once ingestion and the dashboard shell exist to show its output in.
 7. **Portal-only setup instructions for common host-header configurations** [§14 onboarding] -- documentation-shaped work, can trail the features it documents.
 
 ## 3.3 Integrated SAM
@@ -74,19 +74,19 @@ These are sequencing, resourcing, and scope decisions -- not architecture, which
 
 ## 5.1 Stack for `vcns/sam-portal`
 
-The spec is stack-agnostic. `sam-licensing-service` is Cloudflare Workers + KV + Durable Objects, and its admin-auth/deploy-pipeline patterns are directly reusable *if* the portal uses the same stack. But the portal is a materially bigger surface than a licensing worker -- multi-tenant dashboards, fleet views, findings/evidence browsing -- which is a different shape of problem than a lightweight API worker. Worth an explicit decision rather than defaulting to "same as licensing-service" by inertia.
+**Open, deliberately deferred (12 September 2026).** The spec is stack-agnostic. `sam-licensing-service` is Cloudflare Workers + KV + Durable Objects, and its admin-auth/deploy-pipeline patterns are directly reusable *if* the portal uses the same stack. But the portal is a materially bigger surface than a licensing worker -- multi-tenant dashboards, fleet views, findings/evidence browsing -- which is a different shape of problem than a lightweight API worker. Explicitly not decided now; revisit as its own architecture-decision task once Phase 4F is done and Foundation-phase portal work is about to start.
 
 ## 5.2 Sequencing against Phase 4F
 
-`phase4_plan.md` had SAM Portal build sequenced before Phase 4F (Recommendations Engine) in its own recommendation, but that was written before either had a concrete start date. Given `sam-portal` doesn't exist yet and 4F is "zero implementation, lowest priority, deliberately" -- does Foundation-phase portal work start now, does 4F get scoped/started first, or do both proceed in parallel (accepting that they don't share code or blockers)?
+**Resolved, 12 September 2026: Phase 4F first.** Phase 4F (Recommendations Engine, `security-automation-manager` side) is scoped and built before any `sam-portal` Foundation work begins -- not in parallel. `phase4_plan.md`'s older recommendation (portal before 4F) is superseded by this decision.
 
 ## 5.3 First build slice
 
-Section 3.2 above suggests CSP ingestion as the highest-leverage first customer-facing feature, with tenant auth/RBAC as its necessary prerequisite. Does that match the intended starting point, or is there a different first slice in mind -- e.g. leading with the licensing/Checkout integration since much of its server side already exists, or leading with tenant auth plus a bare-bones dashboard shell before any data-ingestion feature at all?
+**Resolved, 12 September 2026: licensing/Checkout integration first.** Not CSP ingestion -- see the reordered build list in §3.2. Reasoning given: most of the server side already exists in `sam-licensing-service`, so it's the lowest-new-design-risk starting point and gives every later feature a real tenant-to-entitlement spine to build against.
 
 ## 5.4 External scanning: build, defer, or buy
 
-Section 10's scan-safety requirements (SSRF prevention, controlled egress, per-tenant kill switches, bounded redirects/bytes/time) are a real, ongoing engineering and infrastructure-cost commitment. Three options worth weighing: build it in-house as specified (full control, full cost), defer it to a later milestone entirely (ship CSP-ingestion-only value first, add scanning once there's a paying customer base to justify the infra spend), or evaluate whether a third-party scanning/monitoring API could satisfy some of §10's requirements at lower engineering cost (would need its own review against §10.1's safety requirements and the non-goals in §22 before adopting).
+**Resolved, 12 September 2026: build in-house, as specified.** Full SSRF-safety/kill-switch/egress control per §10.1, no third-party shortcut and no deferral to a later milestone.
 
 ## 5.5 Solo build or scoped-for-help
 
