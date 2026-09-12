@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows semantic versioning for plugin releases.
 
+## [2.9.101] - 2026-09-12
+
+### Added
+
+- Phase 4C carried-forward item closed: the "repeated errors" signal §10's own signal list names, the second and last of the two (alongside "timing", v2.9.100). `sam_scanner_identities` (schema v44) gains `recent_errors`, a bounded JSON array of 0/1 ints appended in lockstep with the existing `recent_paths`/`recent_seen_at`, recording whether each request's eventual HTTP response was >= 400.
+- Required moving `Scanner_Identity_Store::record()` itself out of `Request_Observer`'s main `observe()` flow and into a new `shutdown` hook (`flush_identity_write()`): the eventual HTTP response status isn't known yet at `send_headers` time, since WordPress hasn't run `query_posts()`/`handle_404()` yet at that point in `WP::main()`. Identity *resolution* (`Identity_Resolver::resolve()`) is unchanged and still runs early, where detectors need it during `evaluate()` -- only the *write* is deferred. `flush_identity_write()` takes an optional `?int $status` parameter (falling back to the real `http_response_code()` only when omitted), the same testability convention `Content_Rewriter::is_processable_response()` already established, rather than stubbing a PHP global.
+- New `Intelligence\Repeated_Error_Analyzer` (mirrors the other analyzers exactly): `is_error_probing()` flags a source whose last several requests (minimum sample of 4) were at least 70% errors.
+- `Bot_Classifier` gains a fourth signal for an unrecognised source (checked after enumeration and timing, before rate escalation): a new `error_probing_scanner` classification state, shown on the Identities tab as "Error probing (repeated 4xx/5xx)".
+- 21 new/updated tests across `RepeatedErrorAnalyzerTest` (new), `BotClassifierTest`, `ScannerIdentityStoreTest`, and `RequestObserverTest` (updated for the deferred-write flow).
+- No behaviour change to detection or blocking -- a new read-only classification signal, computed on demand the same way the existing signals already are. The identity write itself still happens exactly once per request, just later.
+
+### Fixed
+
+- Caught during live-Docker verification, not shipped broken: `add_action( 'shutdown', array( $this, 'flush_identity_write' ) )` fatalled on every real request (`TypeError`: `?int $status` given a `string`). WordPress's own `do_action( 'shutdown' )` -- called with no extra arguments -- still pushes a filler `''` into its internal args array (a long-standing core quirk to guarantee at least one argument reaches a callback), which `WP_Hook` then passes straight through as this method's first parameter. Fixed by explicitly registering with `$accepted_args = 0`, which stops `WP_Hook` from passing that filler value through at all -- `$status` now genuinely defaults to `null` in production, falling back to the real `http_response_code()` as intended.
+
 ## [2.9.100] - 2026-09-11
 
 ### Added

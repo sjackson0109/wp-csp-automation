@@ -3,7 +3,7 @@
  * Plugin Name:       VCNS Security Automation Manager
  * Plugin URI:        https://github.com/vcns/security-automation-manager
  * Description:       Self-learning security headers, built-in attack detection and rate limiting, file-integrity monitoring, and free TLS certificates. No paywall.
- * Version:           2.9.100
+ * Version:           2.9.101
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            VCNS Tech Ltd
@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // ── Core constants ────────────────────────────────────────────────────────────
-define( 'WP_SAM_VERSION', '2.9.100' );
+define( 'WP_SAM_VERSION', '2.9.101' );
 
 /**
  * Schema version. Increment whenever a database schema change is made.
@@ -295,8 +295,26 @@ define( 'WP_SAM_VERSION', '2.9.100' );
  *        when the last several requests arrived at a suspiciously uniform
  *        interval, distinct from enumeration (which is about *what* a
  *        source requests; this is about *when*).
+ *   v44: adds recent_errors to sam_scanner_identities (Phase 4C carried-
+ *        forward item -- the "repeated errors" signal §10's own list
+ *        names, the second and last of the two). Bounded JSON array of
+ *        0/1 ints, appended in lockstep with recent_paths/recent_seen_at,
+ *        recording whether each request's eventual HTTP response was
+ *        >= 400. Required moving Scanner_Identity_Store::record() itself
+ *        from Request_Observer's main observe() flow to a new 'shutdown'
+ *        hook (flush_identity_write()) -- the eventual response status
+ *        isn't known yet at send_headers time, since WordPress hasn't run
+ *        query_posts()/handle_404() yet at that point in WP::main().
+ *        Identity *resolution* (Identity_Resolver::resolve()) stays where
+ *        it was, unchanged -- only the *write* is deferred. Read by the
+ *        new Repeated_Error_Analyzer, wired into Bot_Classifier as a
+ *        fourth signal for an unrecognised source: a new
+ *        'error_probing_scanner' classification state when a
+ *        disproportionate share of a source's recent requests were
+ *        4xx/5xx -- the classic signature of a scanner probing for paths
+ *        that don't exist or aren't allowed.
  */
-define( 'WP_SAM_DB_VERSION', '43' );
+define( 'WP_SAM_DB_VERSION', '44' );
 
 define( 'WP_SAM_FILE', __FILE__ );
 define( 'WP_SAM_DIR', plugin_dir_path( __FILE__ ) );

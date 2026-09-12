@@ -114,12 +114,33 @@ class RequestObserverTest extends TestCase {
 
 		// Simulates send_headers and login_init both firing observe() for the
 		// same request (they never both fire in real WordPress, but the guard
-		// must hold regardless of which hook fires first).
+		// must hold regardless of which hook fires first). The identity
+		// write itself is deferred to 'shutdown' (flush_identity_write()) --
+		// see class docblock's "Repeated-errors signal" note -- so it's
+		// called once here too, the same as real WordPress would.
 		$this->observer->observe();
 		$this->observer->observe();
+		$this->observer->flush_identity_write( 200 );
 
 		$this->assertCount( 1, $this->event_queries() );
 		$this->assertCount( 1, $this->identity_queries() );
+	}
+
+	public function test_flush_identity_write_does_nothing_a_second_time_in_the_same_request(): void {
+		Detector_Registry::register( new Observer_Fixture_Detector() );
+
+		$this->observer->observe();
+		$this->observer->flush_identity_write( 200 );
+		$this->observer->flush_identity_write( 200 ); // e.g. 'shutdown' somehow firing twice.
+
+		$this->assertCount( 1, $this->identity_queries() );
+	}
+
+	public function test_flush_identity_write_does_nothing_when_observe_never_ran(): void {
+		// e.g. 'shutdown' firing on a request this class never observed at all.
+		$this->observer->flush_identity_write( 200 );
+
+		$this->assertSame( array(), $this->identity_queries() );
 	}
 
 	public function test_observe_before_redirect_observes_and_returns_the_location_unchanged(): void {
@@ -161,6 +182,7 @@ class RequestObserverTest extends TestCase {
 
 	public function test_observe_records_an_identity_for_every_request_with_an_ip(): void {
 		$this->observer->observe();
+		$this->observer->flush_identity_write( 200 );
 
 		$identity_queries = $this->identity_queries();
 		$this->assertCount( 1, $identity_queries );
@@ -193,6 +215,7 @@ class RequestObserverTest extends TestCase {
 		$_SERVER['HTTP_USER_AGENT'] = 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)';
 
 		$this->observer->observe();
+		$this->observer->flush_identity_write( 200 );
 
 		$identity_queries = $this->identity_queries();
 		$this->assertCount( 1, $identity_queries );
@@ -253,11 +276,59 @@ class RequestObserverTest extends TestCase {
 		);
 
 		$this->observer->observe();
+		$this->observer->flush_identity_write( 200 );
 
 		$identity_queries = $this->identity_queries();
 		$this->assertCount( 1, $identity_queries );
 		$this->assertStringContainsString( '15169', $identity_queries[0] );
 		$this->assertStringContainsString( "'Google LLC'", $identity_queries[0] );
+	}
+
+	// ── Repeated-errors signal (schema v44, Phase 4C carried-forward item) ──
+
+	public function test_flush_identity_write_records_a_200_as_not_an_error(): void {
+		$this->observer->observe();
+		$this->observer->flush_identity_write( 200 );
+
+		$identity_queries = $this->identity_queries();
+		$this->assertCount( 1, $identity_queries );
+		$this->assertStringContainsString( '[0]', $identity_queries[0] );
+	}
+
+	public function test_flush_identity_write_records_a_404_as_an_error(): void {
+		$this->observer->observe();
+		$this->observer->flush_identity_write( 404 );
+
+		$identity_queries = $this->identity_queries();
+		$this->assertCount( 1, $identity_queries );
+		$this->assertStringContainsString( '[1]', $identity_queries[0] );
+	}
+
+	public function test_flush_identity_write_records_a_500_as_an_error(): void {
+		$this->observer->observe();
+		$this->observer->flush_identity_write( 500 );
+
+		$this->assertStringContainsString( '[1]', $this->identity_queries()[0] );
+	}
+
+	public function test_flush_identity_write_records_a_301_redirect_as_not_an_error(): void {
+		$this->observer->observe();
+		$this->observer->flush_identity_write( 301 );
+
+		$this->assertStringContainsString( '[0]', $this->identity_queries()[0] );
+	}
+
+	public function test_flush_identity_write_falls_back_to_the_real_http_response_code_when_no_status_is_passed(): void {
+		// No $status argument -- exactly how 'shutdown' actually calls this
+		// in production. PHP CLI's http_response_code() always reports
+		// false (no real HTTP response in this SAPI), which must be treated
+		// as "not an error" (falls back to 200) rather than fatal or guessed.
+		$this->observer->observe();
+		$this->observer->flush_identity_write();
+
+		$identity_queries = $this->identity_queries();
+		$this->assertCount( 1, $identity_queries );
+		$this->assertStringContainsString( '[0]', $identity_queries[0] );
 	}
 
 	public function test_observe_never_queries_the_tor_list_when_nothing_matched(): void {

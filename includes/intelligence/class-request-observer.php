@@ -53,6 +53,22 @@
  * lazy, opportunistic way Event_Store's per-event evidence already does --
  * no new resolution, no new cost, just reusing a result already computed.
  *
+ * Repeated-errors signal (schema v44, Phase 4C carried-forward item -- the
+ * "repeated errors" §10 names, alongside "timing" above): the identity
+ * write is deferred from the main observe() flow to a new shutdown hook,
+ * because the eventual HTTP response status (needed to know whether this
+ * was e.g. a 404) isn't known yet at send_headers time -- WordPress hasn't
+ * run query_posts()/handle_404() yet at that point in WP::main(). Deferring
+ * only the WRITE, not the READ: identity_resolver->resolve() still runs
+ * early (still needed by detectors during evaluate(), unchanged above), but
+ * Scanner_Identity_Store::record() itself now runs once, at shutdown, via
+ * $pending_identity_write -- carrying forward every value observe() already
+ * computed, plus http_response_code() >= 400 read at the one point in the
+ * request lifecycle where it's actually settled. The existing $observed
+ * guard still prevents redundant identity *resolution*; a second, separate
+ * $pending_identity_write !== null check on the new shutdown hook prevents
+ * a redundant *write* if shutdown somehow fired more than once.
+ *
  * Detector-family-aware control actions (Phase 4B, .roadmap/phase4_plan.md):
  * each Finding already carries its resolved 'control_action' (Detector_
  * Engine, backed by Detector_Policy_Store). When that action is 'enforce',
@@ -83,6 +99,9 @@ final class Request_Observer {
 
 	private bool $observed = false;
 
+	/** @var array<int, mixed>|null Args for the one deferred Scanner_Identity_Store::record() call this request, or null if none is pending. */
+	private ?array $pending_identity_write = null;
+
 	private Detector_Engine $engine;
 	private Event_Store $events;
 	private Identity_Resolver $identity_resolver;
@@ -111,6 +130,14 @@ final class Request_Observer {
 		add_action( 'login_init', array( $this, 'observe' ) );
 		add_filter( 'wp_redirect', array( $this, 'observe_before_redirect' ), 1, 2 );
 		add_action( 'init', array( $this, 'observe' ), 20 );
+		// $accepted_args = 0: do_action( 'shutdown' ) -- called with no extra
+		// arguments -- still pushes a filler '' into its internal args array
+		// (a long-standing WordPress core quirk), which WP_Hook would
+		// otherwise pass through as this method's first argument. Found live
+		// in Docker as a real fatal (TypeError: string given for ?int
+		// $status), not assumed -- explicitly declaring zero accepted args
+		// is what actually keeps $status defaulting to null in production.
+		add_action( 'shutdown', array( $this, 'flush_identity_write' ), 10, 0 );
 	}
 
 	public function observe_before_redirect( string $location, int $status = 302 ): string {
@@ -156,7 +183,9 @@ final class Request_Observer {
 		}
 
 		if ( null !== $identity && '' !== $context['ip'] ) {
-			$this->identities->record(
+			// Deferred to flush_identity_write() on 'shutdown' -- see class
+			// docblock's "Repeated-errors signal" note for why.
+			$this->pending_identity_write = array(
 				$context['ip'],
 				$identity['claimed_identity'],
 				$context['user_agent'],
@@ -169,7 +198,7 @@ final class Request_Observer {
 				$context['network']['asn_org'] ?? null,
 				$context['network']['country'] ?? null,
 				$context['network']['region'] ?? null,
-				$context['network']['city'] ?? null
+				$context['network']['city'] ?? null,
 			);
 		}
 
@@ -207,6 +236,36 @@ final class Request_Observer {
 				);
 			}
 		}
+	}
+
+	/**
+	 * Writes this request's deferred identity record, if observe() actually
+	 * produced one -- see class docblock's "Repeated-errors signal" note.
+	 * http_response_code() is read here (unless $status is passed directly,
+	 * the same optional-override convention Content_Rewriter::is_processable_
+	 * response() already uses to stay testable without stubbing a PHP global)
+	 * rather than during observe() itself, because this is the one point in
+	 * the request lifecycle where the eventual status is actually settled
+	 * (WordPress's own query resolution and 404 handling, and any REST/admin
+	 * error response, have already run by 'shutdown'). A missing or
+	 * non-numeric code (e.g. a CLI/WP-CLI context with no real HTTP
+	 * response) is treated as "not an error" rather than guessed.
+	 */
+	public function flush_identity_write( ?int $status = null ): void {
+		if ( null === $this->pending_identity_write ) {
+			return;
+		}
+		$args                         = $this->pending_identity_write;
+		$this->pending_identity_write = null;
+
+		if ( null === $status ) {
+			$code   = http_response_code();
+			$status = is_int( $code ) ? $code : 200;
+		}
+
+		$args[] = $status >= 400;
+
+		$this->identities->record( ...$args );
 	}
 
 	/** @return array<string, mixed> */

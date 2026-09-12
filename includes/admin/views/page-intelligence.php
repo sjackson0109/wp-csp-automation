@@ -431,6 +431,7 @@ $tab_help = array(
 			'claimed_crawler_unverified'  => __( 'Claimed crawler (unverified)', 'vcns-security-automation-manager' ),
 			'enumerating_scraper'         => __( 'Enumerating (sequential ID pattern)', 'vcns-security-automation-manager' ),
 			'scripted_timing'             => __( 'Scripted timing (uniform request interval)', 'vcns-security-automation-manager' ),
+			'error_probing_scanner'       => __( 'Error probing (repeated 4xx/5xx)', 'vcns-security-automation-manager' ),
 			'aggressive_unidentified'     => __( 'Aggressive / rate-escalated', 'vcns-security-automation-manager' ),
 			'unclassified'                => __( 'Unclassified', 'vcns-security-automation-manager' ),
 		);
@@ -447,7 +448,7 @@ $tab_help = array(
 		</p>
 
 		<p class="description">
-			<?php esc_html_e( 'A claimed identity only becomes Verified crawler once it also matches that vendor\'s own published network data -- a CIDR range or reverse-DNS suffix recorded on the Vendors tab. Claimed crawler (unverified) means the User-Agent string alone claims a known vendor\'s identity without that match: exactly the impersonation case worth a closer look, since a User-Agent is just a header any script can set to anything it likes. Enumerating (sequential ID pattern), Scripted timing, and Aggressive / rate-escalated all describe an unrecognised source instead -- the first from a fixed-step pattern in its recent request paths (e.g. /product/101, /product/102, /product/103), the second from its last several requests arriving at a suspiciously uniform interval (a script sleeping a fixed duration between requests, rather than a person\'s naturally irregular browsing), the third from having already escalated through Traffic Controls\' own progressive-response ladder. None of the three implies another, and most ordinary traffic triggers none of them, landing on Unclassified.', 'vcns-security-automation-manager' ); ?>
+			<?php esc_html_e( 'A claimed identity only becomes Verified crawler once it also matches that vendor\'s own published network data -- a CIDR range or reverse-DNS suffix recorded on the Vendors tab. Claimed crawler (unverified) means the User-Agent string alone claims a known vendor\'s identity without that match: exactly the impersonation case worth a closer look, since a User-Agent is just a header any script can set to anything it likes. Enumerating (sequential ID pattern), Scripted timing, Error probing, and Aggressive / rate-escalated all describe an unrecognised source instead -- the first from a fixed-step pattern in its recent request paths (e.g. /product/101, /product/102, /product/103), the second from its last several requests arriving at a suspiciously uniform interval (a script sleeping a fixed duration between requests, rather than a person\'s naturally irregular browsing), the third from most of its recent requests coming back as an HTTP error (most often 404 -- a scanner trying paths that don\'t exist rather than a person or crawler following real links), the fourth from having already escalated through Traffic Controls\' own progressive-response ladder. None of these implies another, and most ordinary traffic triggers none of them, landing on Unclassified.', 'vcns-security-automation-manager' ); ?>
 		</p>
 
 		<p class="description">

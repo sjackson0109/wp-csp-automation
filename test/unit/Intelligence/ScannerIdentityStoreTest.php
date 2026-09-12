@@ -209,6 +209,76 @@ class ScannerIdentityStoreTest extends TestCase {
 		$this->assertStringContainsString( 'recent_seen_at', $GLOBALS['_wpdb_queries'][0] );
 	}
 
+	// ── recent_errors (schema v44, Phase 4C carried-forward item) ───────────
+
+	public function test_record_appends_a_1_for_an_error_on_first_insert(): void {
+		$GLOBALS['_wpdb_get_row'] = null;
+
+		$this->store->record( '203.0.113.42', 'Googlebot', 'ua', 'googlebot', 'frontend', 'known_crawler', true, '', null, null, null, null, null, true );
+
+		$this->assertStringContainsString( "'[1]'", $GLOBALS['_wpdb_queries'][0] );
+	}
+
+	public function test_record_appends_a_0_for_a_non_error_on_first_insert(): void {
+		$GLOBALS['_wpdb_get_row'] = null;
+
+		$this->store->record( '203.0.113.42', 'Googlebot', 'ua', 'googlebot', 'frontend', 'known_crawler', true, '', null, null, null, null, null, false );
+
+		$this->assertStringContainsString( "'[0]'", $GLOBALS['_wpdb_queries'][0] );
+	}
+
+	public function test_record_defaults_is_error_to_false_when_not_provided(): void {
+		$GLOBALS['_wpdb_get_row'] = null;
+
+		$this->store->record( '203.0.113.42', 'Googlebot', 'ua', 'googlebot', 'frontend', 'known_crawler', true );
+
+		$this->assertStringContainsString( "'[0]'", $GLOBALS['_wpdb_queries'][0] );
+	}
+
+	public function test_record_appends_to_existing_recent_errors(): void {
+		$GLOBALS['_wpdb_get_row'] = array(
+			'verification_state' => 'known_crawler',
+			'recent_paths'       => '[]',
+			'recent_seen_at'     => '[]',
+			'recent_errors'      => wp_json_encode( array( 0, 1 ) ),
+		);
+
+		$this->store->record( '203.0.113.42', 'Googlebot', 'ua', 'googlebot', 'frontend', 'known_crawler', true, '', null, null, null, null, null, true );
+
+		$this->assertStringContainsString( "'[0,1,1]'", $GLOBALS['_wpdb_queries'][0] );
+	}
+
+	public function test_record_trims_recent_errors_to_the_configured_maximum(): void {
+		$existing = array_fill( 0, Scanner_Identity_Store::MAX_RECENT_PATHS, 0 );
+		$GLOBALS['_wpdb_get_row'] = array(
+			'verification_state' => 'known_crawler',
+			'recent_paths'       => '[]',
+			'recent_seen_at'     => '[]',
+			'recent_errors'      => wp_json_encode( $existing ),
+		);
+
+		$this->store->record( '203.0.113.42', 'Googlebot', 'ua', 'googlebot', 'frontend', 'known_crawler', true, '', null, null, null, null, null, true );
+
+		// Still MAX_RECENT_PATHS entries -- the oldest 0 dropped to make
+		// room for the new 1.
+		$count = Scanner_Identity_Store::MAX_RECENT_PATHS;
+		$expected = wp_json_encode( array_merge( array_fill( 0, $count - 1, 0 ), array( 1 ) ) );
+		$this->assertStringContainsString( addslashes( (string) $expected ), $GLOBALS['_wpdb_queries'][0] );
+	}
+
+	public function test_record_still_appends_an_error_flag_when_a_decision_state_blocks_the_verification_state_update(): void {
+		$GLOBALS['_wpdb_get_row'] = array(
+			'verification_state' => 'customer_authorised',
+			'recent_paths'       => '[]',
+			'recent_seen_at'     => '[]',
+			'recent_errors'      => '[]',
+		);
+
+		$this->store->record( '203.0.113.42', 'Qualys', 'ua', 'qualys', 'frontend', 'known_commercial_scanner', true, '', null, null, null, null, null, true );
+
+		$this->assertStringContainsString( "'[1]'", $GLOBALS['_wpdb_queries'][0] );
+	}
+
 	// ── asn/asn_org/geo_* (schema v42, Phase 4A carried-forward item) ───────
 
 	public function test_record_persists_network_fields_when_provided_on_first_insert(): void {
